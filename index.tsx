@@ -2,8 +2,6 @@
  * @license
  * SPDX-License-Identifier: Apache-2.0
 */
-import {jsPDF} from 'jspdf';
-import html2canvas from 'html2canvas';
 
 // Declare Leaflet.js library (loaded from CDN in index.html)
 declare const L: any;
@@ -27,7 +25,6 @@ let nextCardButton: HTMLButtonElement | null;
 let closeTimelineButton: HTMLButtonElement | null;
 let timelineToggle: Element | null;
 let mapOverlay: Element | null;
-let exportPlanButton: HTMLButtonElement | null;
 let mapElement: HTMLElement | null;
 let mapErrorElement: HTMLElement | null;
 let promptInput: HTMLTextAreaElement | null;
@@ -47,7 +44,6 @@ function initMap(mapEl: HTMLElement, mapErrorEl: HTMLElement) {
     center: [51.505, -0.09], // Default center
     zoom: 13, // Default zoom
     zoomControl: false,
-    preferCanvas: true, // For better PDF export compatibility
   });
 
   // Add OpenStreetMap tile layer
@@ -316,7 +312,7 @@ function createTimeline() {
         const transportItem = document.createElement('div');
         transportItem.className = 'timeline-item transport-item';
         // Use emoji for transport icon for better PDF compatibility
-        const transportIcon = getTransportIcon(connectingLine.transport || 'travel', true);
+        const transportIcon = getTransportIcon(connectingLine.transport || 'travel');
         transportItem.innerHTML = `
           <div class="timeline-time"></div>
           <div class="timeline-connector">
@@ -339,21 +335,9 @@ function createTimeline() {
 }
 
 // Returns an appropriate Font Awesome icon class or emoji based on transport type.
-function getTransportIcon(transportType: string, useEmoji = false): string {
+function getTransportIcon(transportType: string): string {
   const type = (transportType || '').toLowerCase();
-  
-  if (useEmoji) {
-    if (type.includes('walk')) return '🚶';
-    if (type.includes('car') || type.includes('driv')) return '🚗';
-    if (type.includes('bus') || type.includes('transit') || type.includes('public')) return '🚌';
-    if (type.includes('train') || type.includes('subway') || type.includes('metro')) return '🚆';
-    if (type.includes('bike') || type.includes('cycl')) return '🚲';
-    if (type.includes('taxi') || type.includes('cab')) return '🚕';
-    if (type.includes('boat') || type.includes('ferry')) return '🚢';
-    if (type.includes('plane') || type.includes('fly')) return '✈️';
-    return '➡️'; // Default emoji
-  }
-  
+    
   // Return Font Awesome class
   if (type.includes('walk')) return `<i class="fas fa-walking"></i>`;
   if (type.includes('car') || type.includes('driv')) return `<i class="fas fa-car-side"></i>`;
@@ -502,219 +486,6 @@ function navigateCards(direction: number) {
   }
 }
 
-/**
- * Manually draws the itinerary on a jsPDF document.
- * This provides a robust alternative to the buggy `doc.html()` renderer and avoids
- * using special characters/emojis that can cause garbled text in the PDF.
- * @param {jsPDF} doc - The jsPDF document instance.
- * @param {number} startY - The Y position to start drawing from.
- * @returns {number} The final Y position after drawing.
- */
-function drawItineraryOnPdf(doc: jsPDF, startY: number): number {
-  const pageHeight = doc.internal.pageSize.getHeight();
-  const margin = 0.5; // in inches
-  const contentWidth = doc.internal.pageSize.getWidth() - margin * 2;
-  let y = startY;
-
-  // Helper to check for page breaks
-  const checkPageBreak = (neededHeight) => {
-    if (y + neededHeight > pageHeight - margin) {
-      doc.addPage();
-      y = margin;
-    }
-  };
-
-  // Itinerary Header
-  checkPageBreak(0.5);
-  doc.setFontSize(18).setFont(undefined, 'bold');
-  doc.text('Itinerary Details', margin, y);
-  y += 0.3;
-
-  // Build a combined list of locations and travel legs
-  const fullItinerary = [];
-  dayPlanItinerary.forEach((item, index) => {
-    fullItinerary.push({ type: 'location', data: item });
-    if (index < dayPlanItinerary.length - 1) {
-      const nextItem = dayPlanItinerary[index + 1];
-      const connectingLine = lines.find(
-        (line: any) => {
-            if (!line.startPoint || !line.endPoint) return false;
-            const p1 = item.position;
-            const p2 = nextItem.position;
-            const l_start = line.startPoint;
-            const l_end = line.endPoint;
-            // Check for match in either direction
-            return (l_start.lat === p1.lat && l_start.lng === p1.lng && l_end.lat === p2.lat && l_end.lng === p2.lng) ||
-                   (l_start.lat === p2.lat && l_start.lng === p2.lng && l_end.lat === p1.lat && l_end.lng === p1.lng);
-        }
-      ) as any;
-      if (connectingLine) {
-        fullItinerary.push({ type: 'travel', data: connectingLine, to: nextItem.name });
-      }
-    }
-  });
-
-  // Loop and draw each item
-  for (const item of fullItinerary) {
-    if (item.type === 'location') {
-      const { name, sequence, time, duration, description } = item.data;
-      const descLines = doc.splitTextToSize(description || '', contentWidth - 0.5);
-      const itemHeight = 0.6 + (descLines.length * 0.2); // Estimate height
-      checkPageBreak(itemHeight);
-
-      // Sequence Circle and Title
-      doc.setFillColor(33, 150, 243); // #2196F3
-      doc.circle(margin + 0.15, y + 0.1, 0.12, 'F');
-      doc.setTextColor(255, 255, 255).setFontSize(10).setFont(undefined, 'bold');
-      doc.text(String(sequence), margin + 0.15, y + 0.13, { align: 'center' });
-
-      doc.setTextColor(26, 115, 232).setFontSize(16).setFont(undefined, 'bold');
-      doc.text(name, margin + 0.4, y + 0.15);
-      y += 0.35;
-
-      // Time and Duration (plain text to prevent garbling)
-      doc.setTextColor(80, 80, 80).setFontSize(10).setFont(undefined, 'normal');
-      let detailsText = `Time: ${time || 'Flexible'}`;
-      if (duration) detailsText += `  |  Duration: ${duration}`;
-      doc.text(detailsText, margin, y);
-      y += 0.25;
-      
-      // Description
-      doc.setDrawColor(224, 224, 224); // Light grey
-      doc.setLineWidth(0.01);
-      doc.line(margin + 0.05, y - 0.05, margin + 0.05, y + (descLines.length * 0.18));
-      doc.setTextColor(102, 102, 102).setFontSize(10);
-      doc.text(descLines, margin + 0.2, y);
-      y += descLines.length * 0.18 + 0.1;
-
-    } else if (item.type === 'travel') {
-      const { transport, travelTime } = item.data;
-      const to = item.to;
-      checkPageBreak(0.5);
-
-      // Vertical line connector
-      doc.setDrawColor(200, 200, 200);
-      doc.setLineWidth(0.01);
-      doc.line(margin + 0.15, y, margin + 0.15, y + 0.4);
-      
-      // Transport details (plain text to prevent garbling)
-      let travelText = `${transport || 'Travel'} to ${to}`;
-      if (travelTime) travelText += ` (${travelTime})`;
-
-      doc.setFillColor(240, 240, 240); // Light grey background
-      doc.setDrawColor(221, 221, 221);
-      const textWidth = doc.getStringUnitWidth(travelText) * 10 / doc.internal.scaleFactor; // Get text width
-      doc.roundedRect(margin + 0.5, y, textWidth + 0.3, 0.25, 0.1, 0.1, 'FD');
-
-      doc.setTextColor(68, 68, 68).setFontSize(9).setFont(undefined, 'normal');
-      doc.text(travelText, margin + 0.65, y + 0.16);
-      y += 0.5;
-    }
-  }
-  return y;
-}
-
-// Exports the current day plan as a letter-sized PDF with the map.
-async function exportDayPlan() {
-  if (!dayPlanItinerary.length || !exportPlanButton) {
-    alert('There is no day plan to export.');
-    return;
-  }
-  
-  const originalButtonHTML = exportPlanButton.innerHTML;
-  exportPlanButton.disabled = true;
-  exportPlanButton.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Generating...`;
-  
-  // --- UI Preparation for Capture ---
-  const leafletControls = document.querySelector('.leaflet-control-container') as HTMLElement;
-  const cardCarouselEl = document.querySelector('.card-carousel') as HTMLElement;
-  
-  const wasTimelineVisible = document.body.classList.contains('timeline-visible');
-  const originalControlsDisplay = leafletControls ? leafletControls.style.display : '';
-  const originalCarouselDisplay = cardCarouselEl ? cardCarouselEl.style.display : '';
-
-  // Hide UI elements that might interfere with the map capture
-  if (leafletControls) leafletControls.style.display = 'none';
-  if (cardCarouselEl) cardCarouselEl.style.display = 'none';
-  // If timeline is visible, hide it and wait for the animation to complete,
-  // as this also triggers a map resize which is crucial.
-  if (wasTimelineVisible) {
-    hideTimeline();
-    await new Promise(resolve => setTimeout(resolve, 500)); // Wait for animation
-  }
-
-  try {
-    // Wait for map to be fully loaded and settled before taking a screenshot
-    if (isMapInitialized && bounds?.isValid() && mainTileLayer) {
-      const mapReadyPromise = new Promise<void>(resolve => {
-          let timeoutId = null;
-          
-          const onTilesLoaded = () => {
-              if (timeoutId) clearTimeout(timeoutId);
-              mainTileLayer.off('load', onTilesLoaded);
-              // Short delay for final browser paint after tiles are loaded
-              setTimeout(resolve, 500);
-          };
-
-          mainTileLayer.on('load', onTilesLoaded);
-          map.fitBounds(bounds, { padding: [40, 40] });
-
-          // Fallback timeout in case 'load' event doesn't fire (e.g., all tiles cached)
-          timeoutId = setTimeout(() => {
-              mainTileLayer.off('load', onTilesLoaded); // Clean up listener
-              resolve();
-          }, 3000);
-      });
-      await mapReadyPromise;
-    }
-
-    const mapElement = document.getElementById('map');
-    if (!mapElement) throw new Error("Map element not found for PDF export.");
-
-    const mapCanvas = await html2canvas(mapElement, { 
-      useCORS: true,
-      logging: false,
-    });
-    const mapImgData = mapCanvas.toDataURL('image/png', 1.0);
-
-    const doc = new jsPDF({ orientation: 'portrait', unit: 'in', format: 'letter' });
-
-    const pageWidth = doc.internal.pageSize.getWidth();
-    const margin = 0.5;
-    const contentWidth = pageWidth - margin * 2;
-    
-    doc.setFontSize(24).setFont(undefined, 'bold');
-    doc.text('Your Doggy Day Plan', margin, margin + 0.3);
-
-    const mapAspectRatio = mapCanvas.height / mapCanvas.width;
-    const mapImgHeight = contentWidth * mapAspectRatio;
-    doc.addImage(mapImgData, 'PNG', margin, margin + 0.5, contentWidth, mapImgHeight);
-    
-    let yPos = margin + 0.5 + mapImgHeight + 0.3;
-    
-    if (yPos > doc.internal.pageSize.getHeight() - 3) {
-      doc.addPage();
-      yPos = margin;
-    }
-
-    drawItineraryOnPdf(doc, yPos);
-    
-    doc.save('doggy-day-plan.pdf');
-
-  } catch (error) {
-    console.error('Failed to export PDF:', error);
-    alert('An error occurred while generating the PDF. Please try again.');
-  } finally {
-    // --- Restore UI ---
-    if (leafletControls) leafletControls.style.display = originalControlsDisplay;
-    if (cardCarouselEl) cardCarouselEl.style.display = originalCarouselDisplay;
-    if (wasTimelineVisible) showTimeline();
-    
-    exportPlanButton.disabled = false;
-    exportPlanButton.innerHTML = originalButtonHTML;
-  }
-}
-
 // Unified handler for submitting the prompt from either button click or Enter key.
 function handlePromptSubmission() {
   if (!promptInput || !promptInput.value.trim()) return; // Do not submit empty prompts
@@ -743,7 +514,6 @@ function initializeApp() {
   closeTimelineButton = document.querySelector('#close-timeline') as HTMLButtonElement;
   timelineToggle = document.querySelector('#timeline-toggle');
   mapOverlay = document.querySelector('#map-overlay');
-  exportPlanButton = document.querySelector('#export-plan') as HTMLButtonElement;
   mapElement = document.getElementById('map');
   mapErrorElement = document.getElementById('map-error');
   promptInput = document.querySelector('#prompt-input') as HTMLTextAreaElement;
@@ -796,9 +566,6 @@ function initializeApp() {
   }
   if (mapOverlay) {
     mapOverlay.addEventListener('click', () => hideTimeline());
-  }
-  if (exportPlanButton) {
-    exportPlanButton.addEventListener('click', () => exportDayPlan());
   }
 
   // --- Map Initialization ---
