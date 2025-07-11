@@ -503,7 +503,7 @@ function drawItineraryOnPdf(doc: jsPDF, fullItinerary: any[]) {
     doc.setFont('helvetica');
     doc.setFontSize(22);
     doc.text("Your Doggy Day Plan", margin, y);
-    y += 20;
+    y += 25; // Increased spacing
 
     const checkPageBreak = (neededHeight) => {
         if (y + neededHeight > pageHeight - margin) {
@@ -514,7 +514,7 @@ function drawItineraryOnPdf(doc: jsPDF, fullItinerary: any[]) {
 
     fullItinerary.forEach((item, index) => {
         // Estimate height for block to check for page break
-        let blockHeight = 30; // Min height
+        let blockHeight = 40; // Increased min height for more spacing
         const textToMeasure = item.type === 'location' ? item.data.description : item.data.name;
         blockHeight += doc.getTextDimensions(doc.splitTextToSize(textToMeasure || '', contentWidth)).h;
         checkPageBreak(blockHeight);
@@ -540,14 +540,14 @@ function drawItineraryOnPdf(doc: jsPDF, fullItinerary: any[]) {
             doc.text(descriptionLines, contentX, y + 14);
             const descHeight = doc.getTextDimensions(descriptionLines).h;
             
-            let durationY = y + 14 + descHeight + 4;
+            let durationY = y + 14 + descHeight + 6; // Increased spacing
             if(data.duration) {
                 doc.setFontSize(9);
                 doc.setTextColor(33, 150, 243);
                 doc.text(data.duration, contentX, durationY);
                 doc.setTextColor(0,0,0);
             }
-            y = durationY + 15;
+            y = durationY + 20; // Increased spacing
 
         } else if (item.type === 'transport') {
             const data = item.data;
@@ -563,26 +563,27 @@ function drawItineraryOnPdf(doc: jsPDF, fullItinerary: any[]) {
             
             doc.setFontSize(10);
             doc.setFont('helvetica', 'normal');
-            doc.text(data.name || '', contentX, y + 12);
+            doc.text(data.name || '', contentX, y + 14); // Increased spacing
             
-            let travelTimeY = y + 12 + 10;
+            let travelTimeY = y + 14 + 12; // Increased spacing
             if (data.travelTime) {
                 doc.setFontSize(9);
                 doc.setTextColor(33, 150, 243);
                 doc.text(data.travelTime, contentX, travelTimeY);
                 doc.setTextColor(0,0,0);
             }
-            y = travelTimeY + 15;
+            y = travelTimeY + 20; // Increased spacing
         }
 
         // Draw Connector Line
         if (index < fullItinerary.length - 1) {
             doc.setDrawColor(224, 224, 224); // light grey
             doc.setLineWidth(0.5);
-            doc.line(connectorX, itemStartY + 4, connectorX, y - 8);
+            doc.line(connectorX, itemStartY + 4, connectorX, y - 12);
         }
     });
 }
+
 
 // Helper function to introduce a delay.
 const delay = (ms: number) => new Promise(res => setTimeout(res, ms));
@@ -594,6 +595,9 @@ async function exportDayPlan() {
     exportButton.disabled = true;
     exportButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Exporting...';
     
+    // Temporarily hide polylines for a cleaner map image
+    lines.forEach(line => line.setStyle({ opacity: 0 }));
+
     try {
         const mapEl = document.getElementById('map');
         if (!mapEl) throw new Error('Map element not found');
@@ -646,10 +650,13 @@ async function exportDayPlan() {
         console.error('Failed to export PDF:', error);
         if(errorMessage) errorMessage.textContent = 'Could not generate PDF. An error occurred.';
     } finally {
+        // Ensure polylines are always made visible again
+        lines.forEach(line => line.setStyle({ opacity: 1.0 }));
         exportButton.disabled = false;
         exportButton.innerHTML = buttonOriginalText;
     }
 }
+
 
 // Unified handler for submitting the prompt from either button click or Enter key.
 function handlePromptSubmission() {
