@@ -43,8 +43,15 @@ const locationFunctionDeclaration: FunctionDeclaration = {
         type: Type.NUMBER,
         description: 'Order in the day itinerary (1 = first stop of the day).',
       },
+      image_generation_prompt: {
+        type: Type.STRING,
+        description:
+          'A short, vivid, and picturesque prompt for an image generation model, describing a beautiful, dog-friendly scene at this location. Example: "A golden retriever joyfully running on the sandy shore of a dog-friendly beach on a sunny day."',
+      },
     },
-    required: ['name', 'description', 'lat', 'lng', 'time', 'duration', 'sequence'],
+    // By making most fields optional, we improve the reliability of the function calling.
+    // The system prompt still strongly encourages the model to provide all fields.
+    required: ['name', 'description', 'lat', 'lng', 'image_generation_prompt'],
   },
 };
 
@@ -98,39 +105,18 @@ const lineFunctionDeclaration: FunctionDeclaration = {
           'Estimated travel time between locations (e.g., "15 minutes", "1 hour").',
       },
     },
-    required: ['name', 'start', 'end', 'transport', 'travelTime'],
+    // The frontend can handle missing optional fields, so this improves reliability.
+    required: ['start', 'end'],
   },
 };
 
 // System instructions provided to the Google AI model guiding its responses.
-const systemInstructions = `## System Instructions for a Dog-Friendly Interactive Map Explorer
-
-**Model Persona:** You are an expert on all things dog-friendly, a geographically-aware assistant that helps users discover and plan adventures with their furry companions.
-Your primary goal is to answer any location-related query by providing ONLY dog-friendly results, visualized on a map.
-
-**Core Capabilities:**
-
-1. **Geographic Knowledge:** You possess extensive knowledge of dog-friendly:
-   * Parks, beaches, and hiking trails
-   * Restaurant patios, cafes, and breweries
-   * Accommodations and hotels
-   * Stores and attractions
-   * Travel routes and transportation options suitable for dogs
-
-2. **Operation Mode: Doggy Day Planner** 
-   * You are ALWAYS in Doggy Day Planner Mode.
-   * Create detailed day itineraries that are 100% dog-friendly.
-   * Include a logical sequence of locations to visit (e.g., morning hike, lunch at a dog-friendly patio, afternoon at a dog park).
-   * Provide specific times and realistic durations for each stop.
-   * Include travel routes with dog-friendly transport methods (e.g., walking, driving).
-   * Every location MUST include a 'time', 'duration', and 'sequence' number.
-   * Every line connecting locations MUST include 'transport' and 'travelTime'.
-
-**Important Guidelines:**
-* **STRICT RULE:** ONLY return results that are verifiably dog-friendly. If you are unsure if a location permits dogs, DO NOT include it. It is better to return fewer, high-confidence results than to suggest a place where a dog might not be welcome.
-* For ANY query, always provide geographic data through the 'location' and 'line' functions.
-* Never reply with just questions. Always attempt to map the information visually.
-* For day plans, create realistic schedules considering a dog's needs (e.g., time for water breaks, not too much strenuous activity in a row).`;
+const systemInstructions = `You are a helpful assistant that creates dog-friendly day trip itineraries.
+- Your primary goal is to respond to user queries by creating a detailed, dog-friendly day plan.
+- **STRICT RULE**: Only include locations that are verifiably dog-friendly. If unsure, do not include them.
+- You **MUST** use the 'location' and 'line' functions to structure your response.
+- For each 'location', you **MUST** provide a creative 'image_generation_prompt'.
+- For the best user experience, you should ideally include a logical sequence, times, durations, and travel details for the itinerary.`;
 
 // Netlify function handler
 export default async (req: Request) => {
@@ -170,11 +156,9 @@ export default async (req: Request) => {
       apiKey: process.env.API_KEY,
     });
     
-    const finalPrompt = prompt + ' dog friendly day trip';
-    
     const response = await ai.models.generateContent({
       model: 'gemini-2.5-flash',
-      contents: finalPrompt,
+      contents: prompt,
       config: {
         systemInstruction: systemInstructions,
         temperature: 1,
@@ -191,7 +175,44 @@ export default async (req: Request) => {
 
     const functionCalls = response.functionCalls ?? [];
     
-    // Send the function calls back to the client
+    // Check if there are any function calls to process
+    if (functionCalls.length > 0) {
+      const processedCalls = await Promise.all(
+        functionCalls.map(async (call) => {
+          // Only process 'location' calls that should have an image prompt
+          if (call.name === 'location' && call.args.image_generation_prompt) {
+            try {
+              const imageResponse = await ai.models.generateImages({
+                model: 'imagen-3.0-generate-002',
+                prompt: `${call.args.image_generation_prompt}, dog-friendly, photorealistic, high quality`,
+                config: {
+                  numberOfImages: 1,
+                  outputMimeType: 'image/jpeg',
+                  aspectRatio: '16:9',
+                },
+              });
+
+              if (imageResponse.generatedImages?.length > 0) {
+                const base64ImageBytes = imageResponse.generatedImages[0].image.imageBytes;
+                // Add the image data to the arguments of the function call
+                call.args.imageBase64 = base64ImageBytes;
+              }
+            } catch (error) {
+              console.error(`Image generation failed for ${call.args.name}:`, error);
+              // Continue without image data if generation fails
+            }
+          }
+          return call; // Return the call, modified or not
+        })
+      );
+
+      return new Response(JSON.stringify({ functionCalls: processedCalls }), {
+        status: 200,
+        headers: headers,
+      });
+    }
+
+    // Send the (unmodified) function calls back to the client
     return new Response(JSON.stringify({ functionCalls }), {
       status: 200,
       headers: headers,
@@ -205,3 +226,4 @@ export default async (req: Request) => {
     });
   }
 };
+
