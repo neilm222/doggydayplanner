@@ -112,29 +112,46 @@ function hideTimeline() {
   }
 }
 
-// Event Listeners for UI elements.
-promptInput.addEventListener('keydown', (e: KeyboardEvent) => {
-  if (e.code === 'Enter' && !e.shiftKey) {
-    const buttonEl = document.getElementById('generate') as HTMLButtonElement;
-    buttonEl.classList.add('loading');
-    e.preventDefault();
-    e.stopPropagation();
+// Unified handler for submitting the prompt from either button click or Enter key.
+function handlePromptSubmission() {
+  const prompt = promptInput.value;
+  if (!prompt.trim()) return; // Do not submit empty prompts
 
-    setTimeout(() => {
-      sendText(promptInput.value);
-      promptInput.value = '';
-    }, 10);
-  }
-});
-
-generateButton.addEventListener('click', (e) => {
-  const buttonEl = e.currentTarget as HTMLButtonElement;
+  const buttonEl = generateButton as HTMLButtonElement;
   buttonEl.classList.add('loading');
 
+  // Clear and reset textarea UI immediately for better perceived performance
+  promptInput.value = '';
+  promptInput.style.height = '36px'; // Reset height to default
+
+  // Use a small timeout to allow the UI to update before starting the network request
   setTimeout(() => {
-    sendText(promptInput.value);
+    sendText(prompt);
   }, 10);
-});
+}
+
+// Event Listeners for UI elements.
+if (promptInput) {
+  // Add auto-resizing logic to the prompt textarea
+  promptInput.addEventListener('input', () => {
+    promptInput.style.height = 'auto'; // Reset height to recalculate
+    promptInput.style.height = `${promptInput.scrollHeight}px`; // Set to content height
+  });
+  
+  // Add listener for Enter key submission
+  promptInput.addEventListener('keydown', (e: KeyboardEvent) => {
+    if (e.code === 'Enter' && !e.shiftKey) {
+      e.preventDefault(); // Prevent default Enter behavior (new line)
+      handlePromptSubmission();
+    }
+  });
+}
+
+if (generateButton) {
+  generateButton.addEventListener('click', () => {
+    handlePromptSubmission();
+  });
+}
 
 if (prevCardButton) {
   prevCardButton.addEventListener('click', () => navigateCards(-1));
