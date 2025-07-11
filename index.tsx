@@ -205,7 +205,8 @@ async function sendText(prompt: string) {
   const buttonEl = document.getElementById('generate') as HTMLButtonElement;
 
   try {
-    const response = await fetch('/.netlify/functions/generate', {
+    // Use the absolute URL for the Netlify function, allowing calls from other domains.
+    const response = await fetch('https://comforting-biscotti-21b51e.netlify.app/.netlify/functions/generate', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -258,7 +259,7 @@ async function sendText(prompt: string) {
     }
 
   } catch (e) {
-    errorMessage.innerHTML = e.message;
+    errorMessage.innerHTML = "Failed to connect to the planning service. Ensure the Netlify URL is correct in the code. " + e.message;
     console.error('Error sending prompt:', e);
   } finally {
     buttonEl.classList.remove('loading');
@@ -813,3 +814,4 @@ function initializeApp() {
 
 // Start the application
 initializeApp();
+
