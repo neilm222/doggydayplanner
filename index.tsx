@@ -21,51 +21,8 @@ let bounds; // Leaflet LatLngBounds object to fit map around points
 let activeCardIndex = 0; // Index of the currently selected location card
 let dayPlanItinerary = []; // Array to hold structured items for the day plan timeline
 
-// DOM Element references
-const generateButton = document.querySelector('#generate');
-const cardContainer = document.querySelector(
-  '#card-container',
-) as HTMLDivElement;
-const carouselIndicators = document.querySelector(
-  '#carousel-indicators',
-) as HTMLDivElement;
-const prevCardButton = document.querySelector(
-  '#prev-card',
-) as HTMLButtonElement;
-const nextCardButton = document.querySelector(
-  '#next-card',
-) as HTMLButtonElement;
-const cardCarousel = document.querySelector('.card-carousel') as HTMLDivElement;
-const timelineContainer = document.querySelector(
-  '#timeline-container',
-) as HTMLDivElement;
-const timeline = document.querySelector('#timeline') as HTMLDivElement;
-const timelineFooter = document.querySelector(
-  '#timeline-footer',
-) as HTMLDivElement;
-const closeTimelineButton = document.querySelector(
-  '#close-timeline',
-) as HTMLButtonElement;
-const exportPlanButton = document.querySelector(
-  '#export-plan',
-) as HTMLButtonElement;
-const mapContainer = document.querySelector('#map-container');
-const mapElement = document.getElementById('map');
-const mapErrorElement = document.getElementById('map-error');
-const timelineToggle = document.querySelector('#timeline-toggle');
-const mapOverlay = document.querySelector('#map-overlay');
-const spinner = document.querySelector('#spinner');
-const errorMessage = document.querySelector('#error-message');
-const promptInput = document.querySelector(
-  '#prompt-input',
-) as HTMLTextAreaElement;
-
-
-// Set initial placeholder, as Planner Mode is always on.
-promptInput.placeholder = "Plan a dog-friendly day in... (e.g. 'Austin, TX')";
-
 // Initializes the Leaflet map instance.
-function initMap() {
+function initMap(mapElement: HTMLElement, mapErrorElement: HTMLElement) {
   bounds = L.latLngBounds([]);
 
   map = L.map(mapElement, {
@@ -112,68 +69,15 @@ function hideTimeline() {
   }
 }
 
-// Unified handler for submitting the prompt from either button click or Enter key.
-function handlePromptSubmission() {
-  const prompt = promptInput.value;
-  if (!prompt.trim()) return; // Do not submit empty prompts
-
-  const buttonEl = generateButton as HTMLButtonElement;
-  buttonEl.classList.add('loading');
-
-  // Clear and reset textarea UI immediately for better perceived performance
-  promptInput.value = '';
-  promptInput.style.height = '36px'; // Reset height to default
-
-  // Use a small timeout to allow the UI to update before starting the network request
-  setTimeout(() => {
-    sendText(prompt);
-  }, 10);
-}
-
-// Event Listeners for UI elements.
-if (promptInput) {
-  // Add auto-resizing logic to the prompt textarea
-  promptInput.addEventListener('input', () => {
-    promptInput.style.height = 'auto'; // Reset height to recalculate
-    promptInput.style.height = `${promptInput.scrollHeight}px`; // Set to content height
-  });
-  
-  // Add listener for Enter key submission
-  promptInput.addEventListener('keydown', (e: KeyboardEvent) => {
-    if (e.code === 'Enter' && !e.shiftKey) {
-      e.preventDefault(); // Prevent default Enter behavior (new line)
-      handlePromptSubmission();
-    }
-  });
-}
-
-if (generateButton) {
-  generateButton.addEventListener('click', () => {
-    handlePromptSubmission();
-  });
-}
-
-if (prevCardButton) {
-  prevCardButton.addEventListener('click', () => navigateCards(-1));
-}
-if (nextCardButton) {
-  nextCardButton.addEventListener('click', () => navigateCards(1));
-}
-if (closeTimelineButton) {
-  closeTimelineButton.addEventListener('click', () => hideTimeline());
-}
-if (timelineToggle) {
-  timelineToggle.addEventListener('click', () => showTimeline());
-}
-if (mapOverlay) {
-  mapOverlay.addEventListener('click', () => hideTimeline());
-}
-if (exportPlanButton) {
-  exportPlanButton.addEventListener('click', () => exportDayPlan());
-}
-
 // Resets the application state to initial conditions.
 function restart() {
+  const timelineToggle = document.querySelector('#timeline-toggle');
+  const timelineFooter = document.querySelector('#timeline-footer');
+  const cardContainer = document.querySelector('#card-container');
+  const carouselIndicators = document.querySelector('#carousel-indicators');
+  const cardCarousel = document.querySelector('.card-carousel') as HTMLDivElement;
+  const timeline = document.querySelector('#timeline');
+
   points = [];
   dayPlanItinerary = [];
   if (timelineToggle) timelineToggle.classList.add('util-hidden');
@@ -199,10 +103,13 @@ function restart() {
 
 // Sends the user's prompt to our secure Netlify function.
 async function sendText(prompt: string) {
+  const spinner = document.querySelector('#spinner');
+  const errorMessage = document.querySelector('#error-message');
+  const buttonEl = document.getElementById('generate') as HTMLButtonElement;
+
   spinner.classList.remove('util-hidden');
   errorMessage.innerHTML = '';
   restart();
-  const buttonEl = document.getElementById('generate') as HTMLButtonElement;
 
   try {
     // Use the absolute URL for the Netlify function, allowing calls from other domains.
@@ -246,6 +153,8 @@ async function sendText(prompt: string) {
       );
       createTimeline();
       showTimeline();
+      const timelineToggle = document.querySelector('#timeline-toggle');
+      const timelineFooter = document.querySelector('#timeline-footer');
       if (timelineToggle) {
         timelineToggle.classList.remove('util-hidden');
       }
@@ -350,6 +259,7 @@ async function setLeg(args) {
 
 // Creates and populates the timeline view for the day plan.
 function createTimeline() {
+  const timeline = document.querySelector('#timeline') as HTMLDivElement;
   if (!timeline || dayPlanItinerary.length === 0) return;
   timeline.innerHTML = '';
   dayPlanItinerary.forEach((item, index) => {
@@ -472,6 +382,10 @@ function getPlaceholderImage(locationName: string): string {
 
 // Creates and displays location cards in the carousel.
 function createLocationCards() {
+  const cardContainer = document.querySelector('#card-container') as HTMLDivElement;
+  const carouselIndicators = document.querySelector('#carousel-indicators') as HTMLDivElement;
+  const cardCarousel = document.querySelector('.card-carousel') as HTMLDivElement;
+  
   if (!cardContainer || !carouselIndicators || popUps.length === 0) return;
   cardContainer.innerHTML = '';
   carouselIndicators.innerHTML = '';
@@ -505,7 +419,7 @@ function createLocationCards() {
     card.addEventListener('click', () => {
       highlightCard(index);
       if (isMapInitialized) map.panTo(location.position);
-      if (timeline) highlightTimelineItem(index);
+      if (document.querySelector('#timeline')) highlightTimelineItem(index);
     });
 
     cardContainer.appendChild(card);
@@ -524,6 +438,8 @@ function createLocationCards() {
 // Highlights the selected card and corresponding elements.
 function highlightCard(index: number) {
   activeCardIndex = index;
+  const cardContainer = document.querySelector('#card-container') as HTMLDivElement;
+  const carouselIndicators = document.querySelector('#carousel-indicators') as HTMLDivElement;
   const cards = cardContainer?.querySelectorAll('.location-card');
   if (!cards) return;
 
@@ -559,6 +475,7 @@ function highlightCard(index: number) {
 
 // Highlights the timeline item corresponding to the selected card.
 function highlightTimelineItem(cardIndex: number) {
+  const timeline = document.querySelector('#timeline') as HTMLDivElement;
   if (!timeline) return;
   const timelineItems = timeline.querySelectorAll('.timeline-content:not(.transport)');
   timelineItems.forEach((item) => item.classList.remove('active'));
@@ -795,23 +712,101 @@ async function exportDayPlan() {
   }
 }
 
+// Wait until the DOM is fully loaded before running any script that interacts with it.
+document.addEventListener('DOMContentLoaded', () => {
 
-// Main app initialization function
-function initializeApp() {
-  try {
-    // Check if Leaflet is loaded
-    if (typeof L === 'undefined') {
-      throw new Error("Leaflet.js failed to load.");
-    }
-    initMap();
-  } catch (error) {
-    console.error("Map failed to load. The app will run without map features.", error);
-    if (mapErrorElement) mapErrorElement.classList.remove('util-hidden');
-    if (mapElement) mapElement.classList.add('util-hidden');
-    isMapInitialized = false;
+  // DOM Element references
+  const generateButton = document.querySelector('#generate');
+  const prevCardButton = document.querySelector('#prev-card') as HTMLButtonElement;
+  const nextCardButton = document.querySelector('#next-card') as HTMLButtonElement;
+  const closeTimelineButton = document.querySelector('#close-timeline') as HTMLButtonElement;
+  const timelineToggle = document.querySelector('#timeline-toggle');
+  const mapOverlay = document.querySelector('#map-overlay');
+  const exportPlanButton = document.querySelector('#export-plan') as HTMLButtonElement;
+  const mapElement = document.getElementById('map');
+  const mapErrorElement = document.getElementById('map-error');
+  const promptInput = document.querySelector('#prompt-input') as HTMLTextAreaElement;
+
+  // Set initial placeholder, as Planner Mode is always on.
+  promptInput.placeholder = "Plan a dog-friendly day in... (e.g. 'Austin, TX')";
+
+  // Unified handler for submitting the prompt from either button click or Enter key.
+  function handlePromptSubmission() {
+    const prompt = promptInput.value;
+    if (!prompt.trim()) return; // Do not submit empty prompts
+
+    const buttonEl = generateButton as HTMLButtonElement;
+    buttonEl.classList.add('loading');
+
+    // Clear and reset textarea UI immediately for better perceived performance
+    promptInput.value = '';
+    promptInput.style.height = '36px'; // Reset height to default
+
+    // Use a small timeout to allow the UI to update before starting the network request
+    setTimeout(() => {
+      sendText(prompt);
+    }, 10);
   }
-}
 
-// Start the application
-initializeApp();
+  // Event Listeners for UI elements.
+  if (promptInput) {
+    // Add auto-resizing logic to the prompt textarea
+    promptInput.addEventListener('input', () => {
+      promptInput.style.height = 'auto'; // Reset height to recalculate
+      promptInput.style.height = `${promptInput.scrollHeight}px`; // Set to content height
+    });
+    
+    // Add listener for Enter key submission
+    promptInput.addEventListener('keydown', (e: KeyboardEvent) => {
+      if (e.code === 'Enter' && !e.shiftKey) {
+        e.preventDefault(); // Prevent default Enter behavior (new line)
+        handlePromptSubmission();
+      }
+    });
+  }
+
+  if (generateButton) {
+    generateButton.addEventListener('click', () => {
+      handlePromptSubmission();
+    });
+  }
+
+  if (prevCardButton) {
+    prevCardButton.addEventListener('click', () => navigateCards(-1));
+  }
+  if (nextCardButton) {
+    nextCardButton.addEventListener('click', () => navigateCards(1));
+  }
+  if (closeTimelineButton) {
+    closeTimelineButton.addEventListener('click', () => hideTimeline());
+  }
+  if (timelineToggle) {
+    timelineToggle.addEventListener('click', () => showTimeline());
+  }
+  if (mapOverlay) {
+    mapOverlay.addEventListener('click', () => hideTimeline());
+  }
+  if (exportPlanButton) {
+    exportPlanButton.addEventListener('click', () => exportDayPlan());
+  }
+
+  // Main app initialization function
+  function initializeApp() {
+    try {
+      // Check if Leaflet is loaded
+      if (typeof L === 'undefined') {
+        throw new Error("Leaflet.js failed to load.");
+      }
+      initMap(mapElement, mapErrorElement);
+    } catch (error) {
+      console.error("Map failed to load. The app will run without map features.", error);
+      if (mapErrorElement) mapErrorElement.classList.remove('util-hidden');
+      if (mapElement) mapElement.classList.add('util-hidden');
+      isMapInitialized = false;
+    }
+  }
+
+  // Start the application
+  initializeApp();
+});
 
