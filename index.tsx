@@ -804,15 +804,18 @@ function initializeApp() {
   // --- Map Initialization ---
   try {
     if (typeof L === 'undefined') {
-      throw new Error("Leaflet.js failed to load.");
+      throw new Error("Leaflet.js (variable L) is not defined. The script may have failed to load from the CDN.");
     }
     if (mapElement && mapErrorElement) {
         initMap(mapElement, mapErrorElement);
     } else {
-        throw new Error("Map container elements not found in the DOM.");
+        throw new Error("Map container elements (#map or #map-error) were not found in the DOM.");
     }
   } catch (error) {
-    console.error("Map failed to load. The app will run without map features.", error);
+    console.error("CRITICAL MAP FAILURE:", error);
+    // Use alert for high-visibility debugging on the deployed site.
+    alert(`A critical error occurred while loading the map: ${error.message}. Please check the browser console for more details.`);
+
     if (mapErrorElement) mapErrorElement.classList.remove('util-hidden');
     if (mapElement) mapElement.classList.add('util-hidden');
     isMapInitialized = false;
