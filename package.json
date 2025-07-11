@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "build": "esbuild index.tsx --bundle --outfile=index.js --external:jspdf --external:html2canvas"
+    "build": "esbuild index.tsx --bundle --outfile=index.js"
   },
   "dependencies": {
     "@google/genai": "^0.14.0",
