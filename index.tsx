@@ -1,593 +1,118 @@
-/**
- * @license
- * SPDX-License-Identifier: Apache-2.0
-*/
-
-// Declare Leaflet.js library (loaded from CDN in index.html)
-declare const L: any;
-
-// --- Map and App State ---
-let isMapInitialized = false; // Flag to track if the map loaded successfully
-let map; // Holds the Leaflet map instance
-let mainTileLayer; // Holds the main tile layer instance for event listening
-let points = []; // Array to store geographical points from responses
-let markers = []; // Array to store map markers (Leaflet)
-let lines = []; // Array to store polylines representing routes/connections (Leaflet)
-let popUps = []; // Array to store location info including markers and content
-let bounds; // Leaflet LatLngBounds object to fit map around points
-let activeCardIndex = 0; // Index of the currently selected location card
-let dayPlanItinerary = []; // Array to hold structured items for the day plan timeline
-
-// --- DOM Element References (declared here, assigned in initializeApp) ---
-let generateButton: Element | null;
-let prevCardButton: HTMLButtonElement | null;
-let nextCardButton: HTMLButtonElement | null;
-let closeTimelineButton: HTMLButtonElement | null;
-let timelineToggle: Element | null;
-let mapOverlay: Element | null;
-let mapElement: HTMLElement | null;
-let mapErrorElement: HTMLElement | null;
-let promptInput: HTMLTextAreaElement | null;
-let errorMessage: Element | null;
-let timelineFooter: Element | null;
-let cardContainer: Element | null;
-let carouselIndicators: Element | null;
-let cardCarousel: HTMLDivElement | null;
-let timeline: Element | null;
-
-
-// Initializes the Leaflet map instance.
-function initMap(mapEl: HTMLElement, mapErrorEl: HTMLElement) {
-  bounds = L.latLngBounds([]);
-
-  map = L.map(mapEl, {
-    center: [51.505, -0.09], // Default center
-    zoom: 13, // Default zoom
-    zoomControl: false,
-  });
-
-  // Add OpenStreetMap tile layer
-  mainTileLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-  }).addTo(map);
-
-  isMapInitialized = true;
-  if (mapErrorEl) mapErrorEl.classList.add('util-hidden');
-  if (mapEl) mapEl.classList.remove('util-hidden');
-}
-
-// Functions to control the visibility of the timeline panel.
-function showTimeline() {
-  document.body.classList.add('timeline-visible');
-  // Delay map resize to allow for CSS transition
-  if (isMapInitialized && map) {
-    setTimeout(() => {
-      map.invalidateSize();
-      if (bounds && bounds.isValid()) {
-        map.fitBounds(bounds, {padding: [50, 50]});
-      }
-    }, 450); // Corresponds to animation duration
-  }
-}
-
-function hideTimeline() {
-  document.body.classList.remove('timeline-visible');
-  // Delay map resize to allow for CSS transition
-  if (isMapInitialized && map) {
-    setTimeout(() => {
-      map.invalidateSize();
-      if (bounds && bounds.isValid()) {
-        map.fitBounds(bounds, {padding: [50, 50]});
-      }
-    }, 450); // Corresponds to animation duration
-  }
-}
-
-// Resets the application state to initial conditions.
-function restart() {
-  points = [];
-  dayPlanItinerary = [];
-  if (timelineToggle) timelineToggle.classList.add('util-hidden');
-  if (timelineFooter) timelineFooter.classList.add('util-hidden');
-
-  if (isMapInitialized) {
-    bounds = L.latLngBounds([]);
-    markers.forEach((marker) => marker.remove());
-    lines.forEach((line) => line.remove());
-  }
-  markers = [];
-  lines = [];
-  popUps = [];
-
-  if (cardContainer) cardContainer.innerHTML = '';
-  if (carouselIndicators) carouselIndicators.innerHTML = '';
-  if (cardCarousel) cardCarousel.style.display = 'none';
-  if (timeline) timeline.innerHTML = '';
-  if (document.body.classList.contains('timeline-visible')) {
-    hideTimeline();
-  }
-}
-
-// Sends the user's prompt to our secure Netlify function.
-async function sendText(prompt: string) {
-  const buttonEl = generateButton as HTMLButtonElement;
-
-  if (errorMessage) errorMessage.innerHTML = '';
-  restart();
-
-  try {
-    // Use a relative URL for the Netlify function for better portability.
-    const response = await fetch('/.netlify/functions/generate', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ prompt: prompt }),
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error || 'The server returned an error.');
-    }
-    
-    const data = await response.json();
-    const functionCalls = data.functionCalls || [];
-
-    if (functionCalls.length === 0) {
-      throw new Error(
-        'Could not generate any results. Try again, or try a different prompt.',
-      );
-    }
-    
-    // Process the results from the backend
-    for (const fn of functionCalls) {
-      if (fn.name === 'location') {
-        await setPin(fn.args);
-      }
-      if (fn.name === 'line') {
-        await setLeg(fn.args);
-      }
-    }
-    
-    if (dayPlanItinerary.length > 0) {
-      dayPlanItinerary.sort(
-        (a, b) =>
-          (a.sequence || Infinity) - (b.sequence || Infinity) ||
-          (a.time || '').localeCompare(b.time || ''),
-      );
-      createTimeline();
-      showTimeline();
-      if (timelineToggle) {
-        timelineToggle.classList.remove('util-hidden');
-      }
-      if (timelineFooter) {
-        timelineFooter.classList.remove('util-hidden');
-      }
-    }
-    createLocationCards();
-    if(isMapInitialized && bounds.isValid()){
-      map.fitBounds(bounds, {padding: [50, 50]});
-    }
-
-  } catch (e) {
-    if (errorMessage) errorMessage.innerHTML = "Failed to connect to the planning service. Ensure the Netlify URL is correct in the code. " + e.message;
-    console.error('Error sending prompt:', e);
-  } finally {
-    if (buttonEl) buttonEl.classList.remove('loading');
-  }
-}
-
-// Processes location data and adds pins/popups to the map if available.
-async function setPin(args) {
-  const point = {lat: Number(args.lat), lng: Number(args.lng)};
-  points.push(point);
-
-  let popupContent = `<b>${args.name}</b><br/>${args.description}`;
-  if (args.time) {
-    popupContent += `<div style="margin-top: 4px; font-size: 12px; color: #2196F3;">
-                  <i class="fas fa-clock"></i> ${args.time}
-                  ${args.duration ? ` • ${args.duration}` : ''}
-                </div>`;
-  }
-
-  const locationInfo: any = {
-    name: args.name,
-    description: args.description,
-    position: point,
-    time: args.time,
-    duration: args.duration,
-    sequence: args.sequence,
-    popupContent: popupContent,
-    imageBase64: args.imageBase64, // Store the new image data
-  };
-
-  if (isMapInitialized) {
-    bounds.extend(point);
-    const marker = L.marker(point, {title: args.name}).addTo(map);
-    marker.bindPopup(popupContent);
-    markers.push(marker);
-    locationInfo.marker = marker;
-    map.panTo(point);
-  }
-
-  popUps.push(locationInfo);
-  // Planner mode is always on, so add to itinerary if time is provided.
-  if (args.time) {
-    dayPlanItinerary.push(locationInfo);
-  }
-}
-
-// Processes route data and adds lines to the map if available.
-async function setLeg(args) {
-  const start = {lat: Number(args.start.lat), lng: Number(args.start.lng)};
-  const end = {lat: Number(args.end.lat), lng: Number(args.end.lng)};
-  points.push(start, end);
-
-  if (isMapInitialized) {
-    bounds.extend(start);
-    bounds.extend(end);
-    
-    const path = [start, end];
-    const polyline = L.polyline(path, {
-        color: '#2196F3',
-        weight: 4,
-        opacity: 1.0,
-        dashArray: '5, 10'
-    }).addTo(map);
-
-    // Add custom properties from the AI response to the polyline object.
-    // This allows us to retrieve this information later for the timeline.
-    polyline.name = args.name;
-    polyline.transport = args.transport;
-    polyline.travelTime = args.travelTime;
-    // Add start/end points for robust lookup later
-    polyline.startPoint = start;
-    polyline.endPoint = end;
-
-    lines.push(polyline);
-  } else {
-    // If map isn't initialized, we can still create an object with the
-    // line data for the timeline and export functionality.
-    lines.push({
-      name: args.name,
-      transport: args.transport,
-      travelTime: args.travelTime,
-      startPoint: start,
-      endPoint: end,
-      remove: () => {}, // Mock remove for consistency in restart()
-    });
-  }
-}
-
-// Creates and populates the timeline view for the day plan.
-function createTimeline() {
-  if (!timeline || dayPlanItinerary.length === 0) return;
-  timeline.innerHTML = '';
-  dayPlanItinerary.forEach((item, index) => {
-    const timelineItem = document.createElement('div');
-    timelineItem.className = 'timeline-item';
-    const timeDisplay = item.time || 'Flexible';
-    timelineItem.innerHTML = `
-      <div class="timeline-time">${timeDisplay}</div>
-      <div class="timeline-connector">
-        <div class="timeline-dot"></div>
-        <div class="timeline-line"></div>
-      </div>
-      <div class="timeline-content" data-index="${index}">
-        <div class="timeline-title">${item.name}</div>
-        <div class="timeline-description">${item.description}</div>
-        ${item.duration ? `<div class="timeline-duration">${item.duration}</div>` : ''}
-      </div>
-    `;
-    const timelineContent = timelineItem.querySelector('.timeline-content');
-    if (timelineContent) {
-      timelineContent.addEventListener('click', () => {
-        const popupIndex = popUps.findIndex((p) => p.name === item.name);
-        if (popupIndex !== -1) {
-          highlightCard(popupIndex);
-          if (isMapInitialized) map.panTo(popUps[popupIndex].position);
+<!doctype html>
+<html>
+  <head>
+    <title>Dog-Friendly Map Explorer</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="stylesheet" href="index.css">
+    <!-- Leaflet.js CSS for map rendering -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+    <script type="importmap">
+      {
+        "imports": {
+          "@google/genai": "https://esm.sh/@google/genai@^0.14.0",
+          "jspdf": "https://esm.sh/jspdf@^2.5.1",
+          "html2canvas": "https://esm.sh/html2canvas@^1.4.1"
         }
-      });
-    }
-    timeline.appendChild(timelineItem);
-  });
-  if (lines.length > 0) {
-    const timelineItems = timeline.querySelectorAll('.timeline-item');
-    for (let i = 0; i < timelineItems.length - 1; i++) {
-      const currentItem = dayPlanItinerary[i];
-      const nextItem = dayPlanItinerary[i + 1];
-      const connectingLine = lines.find(
-        (line:any) => {
-            if (!line.startPoint || !line.endPoint) return false;
-            const p1 = currentItem.position;
-            const p2 = nextItem.position;
-            const l_start = line.startPoint;
-            const l_end = line.endPoint;
-            // Check for match in either direction
-            return (l_start.lat === p1.lat && l_start.lng === p1.lng && l_end.lat === p2.lat && l_end.lng === p2.lng) ||
-                   (l_start.lat === p2.lat && l_start.lng === p2.lng && l_end.lat === p1.lat && l_end.lng === p1.lng);
-        }
-      );
-      if (connectingLine && (connectingLine.transport || connectingLine.travelTime)) {
-        const transportItem = document.createElement('div');
-        transportItem.className = 'timeline-item transport-item';
-        // Use emoji for transport icon for better PDF compatibility
-        const transportIcon = getTransportIcon(connectingLine.transport || 'travel');
-        transportItem.innerHTML = `
-          <div class="timeline-time"></div>
-          <div class="timeline-connector">
-            <div class="timeline-dot" style="background-color: #999;"></div>
-            <div class="timeline-line"></div>
+      }
+    </script>
+    <!-- Leaflet.js JavaScript library -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  </head>
+  <body>
+    <header class="app-header">
+       <!-- App logo icon -->
+      <div class="app-logo">
+        <i class="fas fa-paw"></i>
+      </div>
+      <!-- Container for search elements positioned at the top -->
+      <div class="search-container">
+        <div class="search-bar">
+          <i class="fas fa-search search-icon"></i>
+          <textarea
+            id="prompt-input"
+            placeholder="Plan a dog-friendly day in... (e.g. 'Austin, TX')"
+          ></textarea>
+          <button id="generate" class="search-button">
+            <i class="fas fa-arrow-right"></i>
+            <div class="spinner"></div>
+          </button>
+        </div>
+
+        <div class="error" id="error-message"></div>
+      </div>
+    </header>
+
+    <main class="main-content">
+      <!-- Main container for the map and related UI elements -->
+      <div id="map-container" class="map-container">
+        <!-- Error message overlay for when the map fails to load -->
+        <div id="map-error" class="map-error-overlay util-hidden">
+          <div class="map-error-content">
+              <i class="fas fa-map-marked-alt"></i>
+              <h3>Map Unavailable</h3>
+              <p>The interactive map could not be loaded. This may be due to the API key settings in this environment.</p>
+              <p>You can still generate dog-friendly suggestions, which will appear below.</p>
           </div>
-          <div class="timeline-content transport">
-            <div class="timeline-title">
-              ${transportIcon}
-              ${connectingLine.transport || 'Travel'}
+        </div>
+
+        <div id="map"></div>
+
+        <!-- Carousel for displaying location cards at the bottom -->
+        <div class="card-carousel">
+          <div class="card-container" id="card-container">
+            <!-- Location cards will be dynamically inserted here by the script -->
+          </div>
+          <div class="carousel-controls">
+            <button class="carousel-arrow prev" id="prev-card">
+              <i class="fas fa-chevron-left"></i>
+            </button>
+            <div class="carousel-indicators" id="carousel-indicators">
+              <!-- Indicator dots will be added dynamically -->
             </div>
-            <div class="timeline-description">${connectingLine.name}</div>
-            ${connectingLine.travelTime ? `<div class="timeline-duration">${connectingLine.travelTime}</div>` : ''}
+            <button class="carousel-arrow next" id="next-card">
+              <i class="fas fa-chevron-right"></i>
+            </button>
           </div>
-        `;
-        timelineItems[i].after(transportItem);
-      }
-    }
-  }
-}
-
-// Returns an appropriate Font Awesome icon class or emoji based on transport type.
-function getTransportIcon(transportType: string): string {
-  const type = (transportType || '').toLowerCase();
-    
-  // Return Font Awesome class
-  if (type.includes('walk')) return `<i class="fas fa-walking"></i>`;
-  if (type.includes('car') || type.includes('driv')) return `<i class="fas fa-car-side"></i>`;
-  if (type.includes('bus') || type.includes('transit') || type.includes('public')) return `<i class="fas fa-bus-alt"></i>`;
-  if (type.includes('train') || type.includes('subway') || type.includes('metro')) return `<i class="fas fa-train"></i>`;
-  if (type.includes('bike') || type.includes('cycl')) return `<i class="fas fa-bicycle"></i>`;
-  if (type.includes('taxi') || type.includes('cab')) return `<i class="fas fa-taxi"></i>`;
-  if (type.includes('boat') || type.includes('ferry')) return `<i class="fas fa-ship"></i>`;
-  if (type.includes('plane') || type.includes('fly')) return `<i class="fas fa-plane-departure"></i>`;
-  return `<i class="fas fa-route"></i>`; // Default icon
-}
-
-
-// Generates a placeholder SVG image for location cards.
-function getPlaceholderImage(locationName: string): string {
-  let hash = 0;
-  for (let i = 0; i < locationName.length; i++) {
-    hash = locationName.charCodeAt(i) + ((hash << 5) - hash);
-  }
-  const hue = hash % 360;
-  const saturation = 60 + (hash % 30);
-  const lightness = 50 + (hash % 20);
-  const letter = locationName.charAt(0).toUpperCase() || '?';
-  return `data:image/svg+xml,${encodeURIComponent(`
-    <svg xmlns="http://www.w3.org/2000/svg" width="300" height="180" viewBox="0 0 300 180">
-      <rect width="300" height="180" fill="hsl(${hue}, ${saturation}%, ${lightness}%)" />
-      <text x="150" y="95" font-family="Arial, sans-serif" font-size="72" fill="white" text-anchor="middle" dominant-baseline="middle">${letter}</text>
-    </svg>
-  `)}`;
-}
-
-// Creates and displays location cards in the carousel.
-function createLocationCards() {
-  if (!cardContainer || !carouselIndicators || !cardCarousel || popUps.length === 0) return;
-  cardContainer.innerHTML = '';
-  carouselIndicators.innerHTML = '';
-  cardCarousel.style.display = 'block';
-
-  popUps.forEach((location, index) => {
-    const card = document.createElement('div');
-    card.className = 'location-card';
-    card.classList.add('day-planner-card'); // Always add planner styles
-    if (index === 0) card.classList.add('card-active');
-
-    // Use generated image if available, otherwise use placeholder as a fallback.
-    const imageUrl = location.imageBase64
-      ? `data:image/jpeg;base64,${location.imageBase64}`
-      : getPlaceholderImage(location.name);
-
-    let cardContent = `<div class="card-image" style="background-image: url('${imageUrl}')"></div>`;
-
-    if (location.sequence) cardContent += `<div class="card-sequence-badge">${location.sequence}</div>`;
-    if (location.time) cardContent += `<div class="card-time-badge">${location.time}</div>`;
-
-    const {lat, lng} = location.position;
-    cardContent += `
-      <div class="card-content">
-        <h3 class="card-title">${location.name}</h3>
-        <p class="card-description">${location.description}</p>
-        ${location.duration ? `<div class="card-duration">${location.duration}</div>` : ''}
-        <div class="card-coordinates">
-          ${lat.toFixed(5)}, ${lng.toFixed(5)}
         </div>
       </div>
-    `;
-    card.innerHTML = cardContent;
 
-    card.addEventListener('click', () => {
-      highlightCard(index);
-      if (isMapInitialized) map.panTo(location.position);
-      if (document.querySelector('#timeline')) highlightTimelineItem(index);
-    });
+      <!-- Semi-transparent overlay displayed when timeline is open on mobile -->
+      <div class="map-overlay" id="map-overlay"></div>
 
-    cardContainer.appendChild(card);
-
-    const dot = document.createElement('div');
-    dot.className = 'carousel-dot';
-    if (index === 0) dot.classList.add('active');
-    carouselIndicators.appendChild(dot);
-  });
-
-  if (cardCarousel && popUps.length > 0) {
-    cardCarousel.style.display = 'block';
-  }
-}
-
-// Highlights the selected card and corresponding elements.
-function highlightCard(index: number) {
-  activeCardIndex = index;
-  const cards = cardContainer?.querySelectorAll('.location-card');
-  if (!cards || !cardContainer) return;
-
-  cards.forEach((card) => card.classList.remove('card-active'));
-  if (cards[index]) {
-    const activeCard = cards[index] as HTMLElement;
-    activeCard.classList.add('card-active');
-    const cardWidth = activeCard.offsetWidth;
-    const containerWidth = (cardContainer as HTMLElement).offsetWidth;
-    const scrollPosition = activeCard.offsetLeft - containerWidth / 2 + cardWidth / 2;
-    (cardContainer as HTMLElement).scrollTo({left: scrollPosition, behavior: 'smooth'});
-  }
-
-  const dots = carouselIndicators?.querySelectorAll('.carousel-dot');
-  if (dots) {
-    dots.forEach((dot, i) => dot.classList.toggle('active', i === index));
-  }
-
-  if (isMapInitialized) {
-    popUps.forEach((location, i) => {
-      if (location.marker) {
-        if(i === index) {
-            location.marker.openPopup();
-        } else {
-            location.marker.closePopup();
-        }
-      }
-    });
-  }
-
-  highlightTimelineItem(index);
-}
-
-// Highlights the timeline item corresponding to the selected card.
-function highlightTimelineItem(cardIndex: number) {
-  if (!timeline) return;
-  const timelineItems = timeline.querySelectorAll('.timeline-content:not(.transport)');
-  timelineItems.forEach((item) => item.classList.remove('active'));
-
-  const location = popUps[cardIndex];
-  for (const item of timelineItems) {
-    const title = item.querySelector('.timeline-title');
-    if (title && title.textContent === location.name) {
-      item.classList.add('active');
-      item.scrollIntoView({behavior: 'smooth', block: 'nearest'});
-      break;
-    }
-  }
-}
-
-// Allows navigation through cards using arrow buttons.
-function navigateCards(direction: number) {
-  const newIndex = activeCardIndex + direction;
-  if (newIndex >= 0 && newIndex < popUps.length) {
-    highlightCard(newIndex);
-    if (isMapInitialized) map.panTo(popUps[newIndex].position);
-  }
-}
-
-// Unified handler for submitting the prompt from either button click or Enter key.
-function handlePromptSubmission() {
-  if (!promptInput || !promptInput.value.trim()) return; // Do not submit empty prompts
-  const prompt = promptInput.value;
-
-  const buttonEl = generateButton as HTMLButtonElement;
-  buttonEl.classList.add('loading');
-
-  // Clear and reset textarea UI immediately for better perceived performance
-  promptInput.value = '';
-  promptInput.style.height = '36px'; // Reset height to default
-
-  // Use a small timeout to allow the UI to update before starting the network request
-  setTimeout(() => {
-    sendText(prompt);
-  }, 10);
-}
-
-// Main app initialization function
-function initializeApp() {
-  // --- Assign DOM Elements ---
-  // This is done here to ensure the DOM is fully loaded before we try to find elements.
-  generateButton = document.querySelector('#generate');
-  prevCardButton = document.querySelector('#prev-card') as HTMLButtonElement;
-  nextCardButton = document.querySelector('#next-card') as HTMLButtonElement;
-  closeTimelineButton = document.querySelector('#close-timeline') as HTMLButtonElement;
-  timelineToggle = document.querySelector('#timeline-toggle');
-  mapOverlay = document.querySelector('#map-overlay');
-  mapElement = document.getElementById('map');
-  mapErrorElement = document.getElementById('map-error');
-  promptInput = document.querySelector('#prompt-input') as HTMLTextAreaElement;
-  errorMessage = document.querySelector('#error-message');
-  timelineFooter = document.querySelector('#timeline-footer');
-  cardContainer = document.querySelector('#card-container');
-  carouselIndicators = document.querySelector('#carousel-indicators');
-  cardCarousel = document.querySelector('.card-carousel') as HTMLDivElement;
-  timeline = document.querySelector('#timeline');
-  
-  // --- Initial Setup ---
-  if(promptInput) {
-    promptInput.placeholder = "Plan a dog-friendly day in... (e.g. 'Austin, TX')";
-  }
-
-  // --- Event Listeners ---
-  if (promptInput) {
-    // Add auto-resizing logic to the prompt textarea
-    promptInput.addEventListener('input', () => {
-      promptInput.style.height = 'auto'; // Reset height to recalculate
-      promptInput.style.height = `${promptInput.scrollHeight}px`; // Set to content height
-    });
+      <!-- Sliding panel for displaying the day plan timeline -->
+      <div class="timeline-container" id="timeline-container">
+        <div class="timeline-header">
+          <h3>Your Doggy Day Plan</h3>
+          <div class="timeline-actions" id="timeline-actions">
+            <button id="close-timeline" class="close-button" aria-label="Close Timeline">
+              <i class="fas fa-times"></i><span class="btn-text">Close</span>
+            </button>
+          </div>
+        </div>
+        <div class="timeline" id="timeline">
+          <!-- Timeline items representing the day plan will be inserted here -->
+        </div>
+        <div class="timeline-footer util-hidden" id="timeline-footer">
+            <button id="export-button" class="export-button">
+              <i class="fas fa-file-pdf"></i>
+              Export Plan to PDF
+            </button>
+        </div>
+      </div>
+    </main>
     
-    // Add listener for Enter key submission
-    promptInput.addEventListener('keydown', (e: KeyboardEvent) => {
-      if (e.code === 'Enter' && !e.shiftKey) {
-        e.preventDefault(); // Prevent default Enter behavior (new line)
-        handlePromptSubmission();
-      }
-    });
-  }
+    <!-- Button to toggle timeline visibility on mobile -->
+    <button id="timeline-toggle" class="timeline-toggle util-hidden">
+      <i class="fas fa-calendar-alt"></i>
+    </button>
+    
+    <div id="spinner" class="util-hidden spinner"></div>
+    
+    <!-- Version marker for debugging deployment issues -->
+    <div class="version-marker">v7.0</div>
 
-  if (generateButton) {
-    generateButton.addEventListener('click', () => {
-      handlePromptSubmission();
-    });
-  }
-
-  if (prevCardButton) {
-    prevCardButton.addEventListener('click', () => navigateCards(-1));
-  }
-  if (nextCardButton) {
-    nextCardButton.addEventListener('click', () => navigateCards(1));
-  }
-  if (closeTimelineButton) {
-    closeTimelineButton.addEventListener('click', () => hideTimeline());
-  }
-  if (timelineToggle) {
-    timelineToggle.addEventListener('click', () => showTimeline());
-  }
-  if (mapOverlay) {
-    mapOverlay.addEventListener('click', () => hideTimeline());
-  }
-
-  // --- Map Initialization ---
-  try {
-    if (typeof L === 'undefined') {
-      throw new Error("Leaflet.js (variable L) is not defined. The script may have failed to load from the CDN.");
-    }
-    if (mapElement && mapErrorElement) {
-        initMap(mapElement, mapErrorElement);
-    } else {
-        throw new Error("Map container elements (#map or #map-error) were not found in the DOM.");
-    }
-  } catch (error) {
-    console.error(`CRITICAL MAP FAILURE: ${error.message}`);
-    if (mapErrorElement) mapErrorElement.classList.remove('util-hidden');
-    if (mapElement) mapElement.classList.add('util-hidden');
-    isMapInitialized = false;
-  }
-}
-
-// Start the application once the DOM is fully loaded.
-// This is a more robust way to prevent race conditions where the script
-// tries to access DOM elements that haven't been created yet.
-document.addEventListener('DOMContentLoaded', initializeApp);
-
+    <script type="module" src="index.js"></script>
+  </body>
+</html>
+        
