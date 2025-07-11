@@ -120,8 +120,8 @@ async function sendText(prompt: string) {
   restart();
 
   try {
-    // Use a relative URL for the Netlify function for better portability.
-    const response = await fetch('/.netlify/functions/generate', {
+    // Use the absolute URL for the Netlify function to allow hosting on a different domain (e.g., Hostinger).
+    const response = await fetch('https://comforting-biscotti-21b51e.netlify.app/.netlify/functions/generate', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -315,8 +315,8 @@ function createTimeline() {
       if (connectingLine && (connectingLine.transport || connectingLine.travelTime)) {
         const transportItem = document.createElement('div');
         transportItem.className = 'timeline-item transport-item';
-        // Use emoji for transport icon for better PDF compatibility
-        const transportIcon = getTransportIcon(connectingLine.transport || 'travel');
+        // Use plain text for transport to prevent garbled emojis in PDF and for a cleaner UI.
+        const transportText = (connectingLine.transport || 'Travel').charAt(0).toUpperCase() + (connectingLine.transport || 'Travel').slice(1);
         transportItem.innerHTML = `
           <div class="timeline-time"></div>
           <div class="timeline-connector">
@@ -325,8 +325,7 @@ function createTimeline() {
           </div>
           <div class="timeline-content transport">
             <div class="timeline-title">
-              ${transportIcon}
-              ${connectingLine.transport || 'Travel'}
+              ${transportText}
             </div>
             <div class="timeline-description">${connectingLine.name}</div>
             ${connectingLine.travelTime ? `<div class="timeline-duration">${connectingLine.travelTime}</div>` : ''}
@@ -337,23 +336,6 @@ function createTimeline() {
     }
   }
 }
-
-// Returns an appropriate Font Awesome icon class or emoji based on transport type.
-function getTransportIcon(transportType: string): string {
-  const type = (transportType || '').toLowerCase();
-    
-  // Return Font Awesome class
-  if (type.includes('walk')) return `<i class="fas fa-walking"></i>`;
-  if (type.includes('car') || type.includes('driv')) return `<i class="fas fa-car-side"></i>`;
-  if (type.includes('bus') || type.includes('transit') || type.includes('public')) return `<i class="fas fa-bus-alt"></i>`;
-  if (type.includes('train') || type.includes('subway') || type.includes('metro')) return `<i class="fas fa-train"></i>`;
-  if (type.includes('bike') || type.includes('cycl')) return `<i class="fas fa-bicycle"></i>`;
-  if (type.includes('taxi') || type.includes('cab')) return `<i class="fas fa-taxi"></i>`;
-  if (type.includes('boat') || type.includes('ferry')) return `<i class="fas fa-ship"></i>`;
-  if (type.includes('plane') || type.includes('fly')) return `<i class="fas fa-plane-departure"></i>`;
-  return `<i class="fas fa-route"></i>`; // Default icon
-}
-
 
 // Generates a placeholder SVG image for location cards.
 function getPlaceholderImage(locationName: string): string {
