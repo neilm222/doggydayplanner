@@ -1,5 +1,4 @@
 
-
 @import url(https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css);
 
 /* Global reset and base font styles */
@@ -11,8 +10,12 @@
     'Open Sans', 'Helvetica Neue', sans-serif;
 }
 
-html, body {
-  height: 100vh; /* Use viewport height for flex layout */
+html {
+  height: 100%;
+}
+
+body {
+  height: 100%;
   margin: 0;
   padding: 0;
   overflow: hidden;
@@ -36,10 +39,11 @@ html, body {
 
 /* New main content area for map and overlays */
 .main-content {
-  flex-grow: 1;
+  flex: 1; /* Use robust flex shorthand */
   position: relative;
   display: flex;
   overflow: hidden; /* Prevent children from spilling out */
+  min-height: 0; /* Add flexbox sizing fix */
 }
 
 /* Utility class to hide elements */
@@ -51,7 +55,7 @@ html, body {
 #map-container {
   color: black;
   position: relative;
-  flex-grow: 1; /* Allow map to take available space */
+  flex: 1; /* Use robust flex shorthand */
   min-width: 0; /* Prevents flexbox from overflowing */
   overflow: hidden;
   display: flex;
@@ -758,3 +762,4 @@ body.timeline-visible .timeline-toggle {
   padding: 2px 4px;
   border-radius: 3px;
 }
+
