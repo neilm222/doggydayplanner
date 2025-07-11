@@ -31,7 +31,6 @@ let exportPlanButton: HTMLButtonElement | null;
 let mapElement: HTMLElement | null;
 let mapErrorElement: HTMLElement | null;
 let promptInput: HTMLTextAreaElement | null;
-let spinner: Element | null;
 let errorMessage: Element | null;
 let timelineFooter: Element | null;
 let cardContainer: Element | null;
@@ -117,7 +116,6 @@ function restart() {
 async function sendText(prompt: string) {
   const buttonEl = generateButton as HTMLButtonElement;
 
-  if (spinner) spinner.classList.remove('util-hidden');
   if (errorMessage) errorMessage.innerHTML = '';
   restart();
 
@@ -180,7 +178,6 @@ async function sendText(prompt: string) {
     console.error('Error sending prompt:', e);
   } finally {
     if (buttonEl) buttonEl.classList.remove('loading');
-    if (spinner) spinner.classList.add('util-hidden');
   }
 }
 
@@ -204,7 +201,8 @@ async function setPin(args) {
     time: args.time,
     duration: args.duration,
     sequence: args.sequence,
-    popupContent: popupContent
+    popupContent: popupContent,
+    imageBase64: args.imageBase64, // Store the new image data
   };
 
   if (isMapInitialized) {
@@ -400,7 +398,11 @@ function createLocationCards() {
     card.classList.add('day-planner-card'); // Always add planner styles
     if (index === 0) card.classList.add('card-active');
 
-    const imageUrl = getPlaceholderImage(location.name);
+    // Use generated image if available, otherwise use placeholder as a fallback.
+    const imageUrl = location.imageBase64
+      ? `data:image/jpeg;base64,${location.imageBase64}`
+      : getPlaceholderImage(location.name);
+
     let cardContent = `<div class="card-image" style="background-image: url('${imageUrl}')"></div>`;
 
     if (location.sequence) cardContent += `<div class="card-sequence-badge">${location.sequence}</div>`;
@@ -745,7 +747,6 @@ function initializeApp() {
   mapElement = document.getElementById('map');
   mapErrorElement = document.getElementById('map-error');
   promptInput = document.querySelector('#prompt-input') as HTMLTextAreaElement;
-  spinner = document.querySelector('#spinner');
   errorMessage = document.querySelector('#error-message');
   timelineFooter = document.querySelector('#timeline-footer');
   cardContainer = document.querySelector('#card-container');
