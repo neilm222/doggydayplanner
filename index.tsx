@@ -490,72 +490,173 @@ function navigateCards(direction: number) {
   }
 }
 
+// Helper to get a transport emoji for the PDF
+function getTransportEmoji(transportType: string): string {
+    const type = (transportType || '').toLowerCase();
+    if (type.includes('walk')) return '🚶';
+    if (type.includes('car') || type.includes('driv')) return '🚗';
+    if (type.includes('bus') || type.includes('transit') || type.includes('public')) return '🚌';
+    if (type.includes('train') || type.includes('subway') || type.includes('metro')) return '🚆';
+    if (type.includes('bike') || type.includes('cycl')) return '🚲';
+    if (type.includes('taxi') || type.includes('cab')) return '🚕';
+    if (type.includes('boat') || type.includes('ferry')) return '🚢';
+    if (type.includes('plane') || type.includes('fly')) return '✈️';
+    return '➡️'; // Default emoji
+}
+
+// Manually draws the itinerary on the PDF, handling page breaks.
+function drawItineraryOnPdf(doc: jsPDF, fullItinerary: any[]) {
+    let y = 40; // Initial y position
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const margin = 20;
+    const timeX = margin;
+    const connectorX = timeX + 45;
+    const contentX = connectorX + 15;
+    const contentWidth = doc.internal.pageSize.getWidth() - contentX - margin;
+
+    doc.setFont('helvetica');
+    doc.setFontSize(22);
+    doc.text("Your Doggy Day Plan", margin, y);
+    y += 20;
+
+    const checkPageBreak = (neededHeight) => {
+        if (y + neededHeight > pageHeight - margin) {
+            doc.addPage();
+            y = margin;
+        }
+    };
+
+    fullItinerary.forEach((item, index) => {
+        // Estimate height for block to check for page break
+        let blockHeight = 30; // Min height
+        const textToMeasure = item.type === 'location' ? item.data.description : item.data.name;
+        blockHeight += doc.getTextDimensions(doc.splitTextToSize(textToMeasure || '', contentWidth)).h;
+        checkPageBreak(blockHeight);
+
+        const itemStartY = y;
+
+        if (item.type === 'location') {
+            const data = item.data;
+            // Draw time and location dot
+            doc.setFontSize(12);
+            doc.setFont('helvetica', 'bold');
+            doc.text(data.time || '', timeX, y);
+            doc.setFillColor(33, 150, 243); // blue
+            doc.circle(connectorX, y - 1, 3, 'F');
+
+            // Draw content
+            doc.setFontSize(14);
+            doc.text(data.name, contentX, y);
+            
+            doc.setFontSize(10);
+            doc.setFont('helvetica', 'normal');
+            const descriptionLines = doc.splitTextToSize(data.description || '', contentWidth);
+            doc.text(descriptionLines, contentX, y + 14);
+            const descHeight = doc.getTextDimensions(descriptionLines).h;
+            
+            let durationY = y + 14 + descHeight + 4;
+            if(data.duration) {
+                doc.setFontSize(9);
+                doc.setTextColor(33, 150, 243);
+                doc.text(data.duration, contentX, durationY);
+                doc.setTextColor(0,0,0);
+            }
+            y = durationY + 15;
+
+        } else if (item.type === 'transport') {
+            const data = item.data;
+            // Draw transport dot
+            doc.setFillColor(153, 153, 153); // grey
+            doc.circle(connectorX, y - 1, 3, 'F');
+
+            // Draw content
+            doc.setFontSize(12);
+            doc.setFont('helvetica', 'bold');
+            const emoji = getTransportEmoji(data.transport);
+            doc.text(`${emoji} ${data.transport || 'Travel'}`, contentX, y);
+            
+            doc.setFontSize(10);
+            doc.setFont('helvetica', 'normal');
+            doc.text(data.name || '', contentX, y + 12);
+            
+            let travelTimeY = y + 12 + 10;
+            if (data.travelTime) {
+                doc.setFontSize(9);
+                doc.setTextColor(33, 150, 243);
+                doc.text(data.travelTime, contentX, travelTimeY);
+                doc.setTextColor(0,0,0);
+            }
+            y = travelTimeY + 15;
+        }
+
+        // Draw Connector Line
+        if (index < fullItinerary.length - 1) {
+            doc.setDrawColor(224, 224, 224); // light grey
+            doc.setLineWidth(0.5);
+            doc.line(connectorX, itemStartY + 4, connectorX, y - 8);
+        }
+    });
+}
+
+
 // Exports the day plan timeline to a PDF document.
 async function exportDayPlan() {
-  if (!exportButton || !timeline) {
-    console.error('Export button or timeline element not found.');
-    return;
-  }
-  const buttonOriginalText = exportButton.innerHTML;
-  exportButton.disabled = true;
-  exportButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Exporting...';
-
-  const timelineEl = timeline as HTMLElement;
-  // Store original styles to restore them later
-  const originalStyles = {
-    height: timelineEl.style.height,
-    overflowY: timelineEl.style.overflowY,
-  };
-
-  try {
-    // Temporarily modify styles to ensure the full content is rendered
-    timelineEl.style.height = `${timelineEl.scrollHeight}px`;
-    timelineEl.style.overflowY = 'visible';
+    if (!exportButton) return;
+    const buttonOriginalText = exportButton.innerHTML;
+    exportButton.disabled = true;
+    exportButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Exporting...';
     
-    // Allow a very brief moment for the browser to apply the style changes
-    await new Promise(resolve => setTimeout(resolve, 50));
+    try {
+        const mapEl = document.getElementById('map');
+        if (!mapEl) throw new Error('Map element not found');
 
-    const canvas = await html2canvas(timelineEl, {
-      scale: 2, // Increase scale for better resolution
-      useCORS: true,
-      backgroundColor: '#ffffff',
-    });
+        // 1. Capture Map
+        const mapCanvas = await html2canvas(mapEl, { useCORS: true });
+        const mapImgData = mapCanvas.toDataURL('image/png');
 
-    const imgData = canvas.toDataURL('image/png');
-    const pdf = new jsPDF({
-      orientation: 'portrait',
-      unit: 'pt',
-      format: 'a4',
-    });
+        // 2. Create PDF
+        const pdf = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' });
+        
+        // 3. Add Map to first page
+        pdf.addImage(mapImgData, 'PNG', 0, 0, pdf.internal.pageSize.getWidth(), 0);
 
-    const pdfWidth = pdf.internal.pageSize.getWidth();
-    const pdfHeight = pdf.internal.pageSize.getHeight();
-    const canvasWidth = canvas.width;
-    const canvasHeight = canvas.height;
-    const ratio = canvasWidth / canvasHeight;
+        // 4. Create full itinerary data by merging locations and travel legs
+        const fullItinerary = [];
+        dayPlanItinerary.forEach((item, index) => {
+            fullItinerary.push({ type: 'location', data: item });
+            if (index < dayPlanItinerary.length - 1) {
+                const nextItem = dayPlanItinerary[index + 1];
+                const connectingLine = lines.find((line: any) => {
+                    if (!line.startPoint || !line.endPoint) return false;
+                    const p1 = item.position;
+                    const p2 = nextItem.position;
+                    const l_start = line.startPoint;
+                    const l_end = line.endPoint;
+                    return (l_start.lat === p1.lat && l_start.lng === p1.lng && l_end.lat === p2.lat && l_end.lng === p2.lng) ||
+                           (l_start.lat === p2.lat && l_start.lng === p2.lng && l_end.lat === p1.lat && l_end.lng === p1.lng);
+                });
+                if (connectingLine) {
+                    fullItinerary.push({ type: 'transport', data: connectingLine });
+                }
+            }
+        });
 
-    const width = pdfWidth - 40; // With margins
-    let height = width / ratio;
+        // 5. Add new page and draw itinerary
+        if (fullItinerary.length > 0) {
+            pdf.addPage();
+            drawItineraryOnPdf(pdf, fullItinerary);
+        }
 
-    // Check if content exceeds page height
-    if (height > pdfHeight - 60) {
-      height = pdfHeight - 60; // Fit to page with margin
+        // 6. Save PDF
+        pdf.save('doggy-day-plan.pdf');
+
+    } catch (error) {
+        console.error('Failed to export PDF:', error);
+        if(errorMessage) errorMessage.textContent = 'Could not generate PDF. An error occurred.';
+    } finally {
+        exportButton.disabled = false;
+        exportButton.innerHTML = buttonOriginalText;
     }
-
-    pdf.text("Your Doggy Day Plan", 20, 30);
-    pdf.addImage(imgData, 'PNG', 20, 50, width, height);
-    pdf.save('doggy-day-plan.pdf');
-
-  } catch (error) {
-    console.error('Failed to export PDF:', error);
-    if(errorMessage) errorMessage.textContent = 'Could not generate PDF. An error occurred.';
-  } finally {
-    // Crucially, restore the original styles
-    timelineEl.style.height = originalStyles.height;
-    timelineEl.style.overflowY = originalStyles.overflowY;
-    exportButton.disabled = false;
-    exportButton.innerHTML = buttonOriginalText;
-  }
 }
 
 // Unified handler for submitting the prompt from either button click or Enter key.
