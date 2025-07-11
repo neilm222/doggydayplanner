@@ -10,7 +10,9 @@
     <script type="importmap">
       {
         "imports": {
-          "@google/genai": "https://esm.sh/@google/genai@^0.14.0"
+          "@google/genai": "https://esm.sh/@google/genai@^0.14.0",
+          "jspdf": "https://esm.sh/jspdf@^2.5.1",
+          "html2canvas": "https://esm.sh/html2canvas@^1.4.1"
         }
       }
     </script>
@@ -92,7 +94,10 @@
           <!-- Timeline items representing the day plan will be inserted here -->
         </div>
         <div class="timeline-footer util-hidden" id="timeline-footer">
-            <!-- PDF Export button removed -->
+            <button id="export-button" class="export-button">
+              <i class="fas fa-file-pdf"></i>
+              Export Plan to PDF
+            </button>
         </div>
       </div>
     </main>
@@ -105,7 +110,7 @@
     <div id="spinner" class="util-hidden spinner"></div>
     
     <!-- Version marker for debugging deployment issues -->
-    <div class="version-marker">v6.0</div>
+    <div class="version-marker">v7.0</div>
 
     <script type="module" src="index.js"></script>
   </body>
