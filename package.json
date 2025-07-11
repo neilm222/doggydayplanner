@@ -6,11 +6,10 @@
     "build": "esbuild index.tsx --bundle --outfile=index.js --external:jspdf --external:html2canvas"
   },
   "dependencies": {
-    "@google/genai": "^0.7.0"
-  },
-  "devDependencies": {
+    "@google/genai": "^0.14.0",
     "@types/node": "^20.0.0",
     "esbuild": "^0.20.2",
     "typescript": "^5.0.0"
-  }
+  },
+  "devDependencies": {}
 }
