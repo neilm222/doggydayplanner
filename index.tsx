@@ -20,24 +20,24 @@ let bounds; // Leaflet LatLngBounds object to fit map around points
 let activeCardIndex = 0; // Index of the currently selected location card
 let dayPlanItinerary = []; // Array to hold structured items for the day plan timeline
 
-// --- DOM Element References ---
-const generateButton = document.querySelector('#generate');
-const prevCardButton = document.querySelector('#prev-card') as HTMLButtonElement;
-const nextCardButton = document.querySelector('#next-card') as HTMLButtonElement;
-const closeTimelineButton = document.querySelector('#close-timeline') as HTMLButtonElement;
-const timelineToggle = document.querySelector('#timeline-toggle');
-const mapOverlay = document.querySelector('#map-overlay');
-const exportPlanButton = document.querySelector('#export-plan') as HTMLButtonElement;
-const mapElement = document.getElementById('map');
-const mapErrorElement = document.getElementById('map-error');
-const promptInput = document.querySelector('#prompt-input') as HTMLTextAreaElement;
-const spinner = document.querySelector('#spinner');
-const errorMessage = document.querySelector('#error-message');
-const timelineFooter = document.querySelector('#timeline-footer');
-const cardContainer = document.querySelector('#card-container');
-const carouselIndicators = document.querySelector('#carousel-indicators');
-const cardCarousel = document.querySelector('.card-carousel') as HTMLDivElement;
-const timeline = document.querySelector('#timeline');
+// --- DOM Element References (declared here, assigned in initializeApp) ---
+let generateButton: Element | null;
+let prevCardButton: HTMLButtonElement | null;
+let nextCardButton: HTMLButtonElement | null;
+let closeTimelineButton: HTMLButtonElement | null;
+let timelineToggle: Element | null;
+let mapOverlay: Element | null;
+let exportPlanButton: HTMLButtonElement | null;
+let mapElement: HTMLElement | null;
+let mapErrorElement: HTMLElement | null;
+let promptInput: HTMLTextAreaElement | null;
+let spinner: Element | null;
+let errorMessage: Element | null;
+let timelineFooter: Element | null;
+let cardContainer: Element | null;
+let carouselIndicators: Element | null;
+let cardCarousel: HTMLDivElement | null;
+let timeline: Element | null;
 
 
 // Initializes the Leaflet map instance.
@@ -117,8 +117,8 @@ function restart() {
 async function sendText(prompt: string) {
   const buttonEl = generateButton as HTMLButtonElement;
 
-  spinner.classList.remove('util-hidden');
-  errorMessage.innerHTML = '';
+  if (spinner) spinner.classList.remove('util-hidden');
+  if (errorMessage) errorMessage.innerHTML = '';
   restart();
 
   try {
@@ -176,11 +176,11 @@ async function sendText(prompt: string) {
     }
 
   } catch (e) {
-    errorMessage.innerHTML = "Failed to connect to the planning service. Ensure the Netlify URL is correct in the code. " + e.message;
+    if (errorMessage) errorMessage.innerHTML = "Failed to connect to the planning service. Ensure the Netlify URL is correct in the code. " + e.message;
     console.error('Error sending prompt:', e);
   } finally {
     if (buttonEl) buttonEl.classList.remove('loading');
-    spinner.classList.add('util-hidden');
+    if (spinner) spinner.classList.add('util-hidden');
   }
 }
 
@@ -389,7 +389,7 @@ function getPlaceholderImage(locationName: string): string {
 
 // Creates and displays location cards in the carousel.
 function createLocationCards() {
-  if (!cardContainer || !carouselIndicators || popUps.length === 0) return;
+  if (!cardContainer || !carouselIndicators || !cardCarousel || popUps.length === 0) return;
   cardContainer.innerHTML = '';
   carouselIndicators.innerHTML = '';
   cardCarousel.style.display = 'block';
@@ -442,16 +442,16 @@ function createLocationCards() {
 function highlightCard(index: number) {
   activeCardIndex = index;
   const cards = cardContainer?.querySelectorAll('.location-card');
-  if (!cards) return;
+  if (!cards || !cardContainer) return;
 
   cards.forEach((card) => card.classList.remove('card-active'));
   if (cards[index]) {
     const activeCard = cards[index] as HTMLElement;
     activeCard.classList.add('card-active');
     const cardWidth = activeCard.offsetWidth;
-    const containerWidth = cardContainer.offsetWidth;
+    const containerWidth = (cardContainer as HTMLElement).offsetWidth;
     const scrollPosition = activeCard.offsetLeft - containerWidth / 2 + cardWidth / 2;
-    cardContainer.scrollTo({left: scrollPosition, behavior: 'smooth'});
+    (cardContainer as HTMLElement).scrollTo({left: scrollPosition, behavior: 'smooth'});
   }
 
   const dots = carouselIndicators?.querySelectorAll('.carousel-dot');
@@ -614,15 +614,14 @@ function drawItineraryOnPdf(doc: jsPDF, startY: number): number {
 
 // Exports the current day plan as a letter-sized PDF with the map.
 async function exportDayPlan() {
-  if (!dayPlanItinerary.length) {
+  if (!dayPlanItinerary.length || !exportPlanButton) {
     alert('There is no day plan to export.');
     return;
   }
-
-  const exportButton = document.querySelector('#export-plan') as HTMLButtonElement;
-  const originalButtonHTML = exportButton.innerHTML;
-  exportButton.disabled = true;
-  exportButton.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Generating...`;
+  
+  const originalButtonHTML = exportPlanButton.innerHTML;
+  exportPlanButton.disabled = true;
+  exportPlanButton.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Generating...`;
   
   // --- UI Preparation for Capture ---
   const leafletControls = document.querySelector('.leaflet-control-container') as HTMLElement;
@@ -668,6 +667,8 @@ async function exportDayPlan() {
     }
 
     const mapElement = document.getElementById('map');
+    if (!mapElement) throw new Error("Map element not found for PDF export.");
+
     const mapCanvas = await html2canvas(mapElement, { 
       useCORS: true,
       logging: false,
@@ -707,15 +708,15 @@ async function exportDayPlan() {
     if (cardCarouselEl) cardCarouselEl.style.display = originalCarouselDisplay;
     if (wasTimelineVisible) showTimeline();
     
-    exportButton.disabled = false;
-    exportButton.innerHTML = originalButtonHTML;
+    exportPlanButton.disabled = false;
+    exportPlanButton.innerHTML = originalButtonHTML;
   }
 }
 
 // Unified handler for submitting the prompt from either button click or Enter key.
 function handlePromptSubmission() {
+  if (!promptInput || !promptInput.value.trim()) return; // Do not submit empty prompts
   const prompt = promptInput.value;
-  if (!prompt.trim()) return; // Do not submit empty prompts
 
   const buttonEl = generateButton as HTMLButtonElement;
   buttonEl.classList.add('loading');
@@ -732,10 +733,32 @@ function handlePromptSubmission() {
 
 // Main app initialization function
 function initializeApp() {
-  // Set initial placeholder, as Planner Mode is always on.
-  promptInput.placeholder = "Plan a dog-friendly day in... (e.g. 'Austin, TX')";
+  // --- Assign DOM Elements ---
+  // This is done here to ensure the DOM is fully loaded before we try to find elements.
+  generateButton = document.querySelector('#generate');
+  prevCardButton = document.querySelector('#prev-card') as HTMLButtonElement;
+  nextCardButton = document.querySelector('#next-card') as HTMLButtonElement;
+  closeTimelineButton = document.querySelector('#close-timeline') as HTMLButtonElement;
+  timelineToggle = document.querySelector('#timeline-toggle');
+  mapOverlay = document.querySelector('#map-overlay');
+  exportPlanButton = document.querySelector('#export-plan') as HTMLButtonElement;
+  mapElement = document.getElementById('map');
+  mapErrorElement = document.getElementById('map-error');
+  promptInput = document.querySelector('#prompt-input') as HTMLTextAreaElement;
+  spinner = document.querySelector('#spinner');
+  errorMessage = document.querySelector('#error-message');
+  timelineFooter = document.querySelector('#timeline-footer');
+  cardContainer = document.querySelector('#card-container');
+  carouselIndicators = document.querySelector('#carousel-indicators');
+  cardCarousel = document.querySelector('.card-carousel') as HTMLDivElement;
+  timeline = document.querySelector('#timeline');
+  
+  // --- Initial Setup ---
+  if(promptInput) {
+    promptInput.placeholder = "Plan a dog-friendly day in... (e.g. 'Austin, TX')";
+  }
 
-  // Event Listeners for UI elements.
+  // --- Event Listeners ---
   if (promptInput) {
     // Add auto-resizing logic to the prompt textarea
     promptInput.addEventListener('input', () => {
@@ -777,12 +800,16 @@ function initializeApp() {
     exportPlanButton.addEventListener('click', () => exportDayPlan());
   }
 
+  // --- Map Initialization ---
   try {
-    // Check if Leaflet is loaded
     if (typeof L === 'undefined') {
       throw new Error("Leaflet.js failed to load.");
     }
-    initMap(mapElement, mapErrorElement);
+    if (mapElement && mapErrorElement) {
+        initMap(mapElement, mapErrorElement);
+    } else {
+        throw new Error("Map container elements not found in the DOM.");
+    }
   } catch (error) {
     console.error("Map failed to load. The app will run without map features.", error);
     if (mapErrorElement) mapErrorElement.classList.remove('util-hidden');
