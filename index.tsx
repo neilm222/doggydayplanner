@@ -9,7 +9,6 @@ import html2canvas from 'html2canvas';
 declare const L: any;
 
 // --- Map and App State ---
-// These will be populated by the initialization function.
 let isMapInitialized = false; // Flag to track if the map loaded successfully
 let map; // Holds the Leaflet map instance
 let mainTileLayer; // Holds the main tile layer instance for event listening
@@ -21,11 +20,31 @@ let bounds; // Leaflet LatLngBounds object to fit map around points
 let activeCardIndex = 0; // Index of the currently selected location card
 let dayPlanItinerary = []; // Array to hold structured items for the day plan timeline
 
+// --- DOM Element References ---
+const generateButton = document.querySelector('#generate');
+const prevCardButton = document.querySelector('#prev-card') as HTMLButtonElement;
+const nextCardButton = document.querySelector('#next-card') as HTMLButtonElement;
+const closeTimelineButton = document.querySelector('#close-timeline') as HTMLButtonElement;
+const timelineToggle = document.querySelector('#timeline-toggle');
+const mapOverlay = document.querySelector('#map-overlay');
+const exportPlanButton = document.querySelector('#export-plan') as HTMLButtonElement;
+const mapElement = document.getElementById('map');
+const mapErrorElement = document.getElementById('map-error');
+const promptInput = document.querySelector('#prompt-input') as HTMLTextAreaElement;
+const spinner = document.querySelector('#spinner');
+const errorMessage = document.querySelector('#error-message');
+const timelineFooter = document.querySelector('#timeline-footer');
+const cardContainer = document.querySelector('#card-container');
+const carouselIndicators = document.querySelector('#carousel-indicators');
+const cardCarousel = document.querySelector('.card-carousel') as HTMLDivElement;
+const timeline = document.querySelector('#timeline');
+
+
 // Initializes the Leaflet map instance.
-function initMap(mapElement: HTMLElement, mapErrorElement: HTMLElement) {
+function initMap(mapEl: HTMLElement, mapErrorEl: HTMLElement) {
   bounds = L.latLngBounds([]);
 
-  map = L.map(mapElement, {
+  map = L.map(mapEl, {
     center: [51.505, -0.09], // Default center
     zoom: 13, // Default zoom
     zoomControl: false,
@@ -38,8 +57,8 @@ function initMap(mapElement: HTMLElement, mapErrorElement: HTMLElement) {
   }).addTo(map);
 
   isMapInitialized = true;
-  if (mapErrorElement) mapErrorElement.classList.add('util-hidden');
-  if (mapElement) mapElement.classList.remove('util-hidden');
+  if (mapErrorEl) mapErrorEl.classList.add('util-hidden');
+  if (mapEl) mapEl.classList.remove('util-hidden');
 }
 
 // Functions to control the visibility of the timeline panel.
@@ -71,13 +90,6 @@ function hideTimeline() {
 
 // Resets the application state to initial conditions.
 function restart() {
-  const timelineToggle = document.querySelector('#timeline-toggle');
-  const timelineFooter = document.querySelector('#timeline-footer');
-  const cardContainer = document.querySelector('#card-container');
-  const carouselIndicators = document.querySelector('#carousel-indicators');
-  const cardCarousel = document.querySelector('.card-carousel') as HTMLDivElement;
-  const timeline = document.querySelector('#timeline');
-
   points = [];
   dayPlanItinerary = [];
   if (timelineToggle) timelineToggle.classList.add('util-hidden');
@@ -103,9 +115,7 @@ function restart() {
 
 // Sends the user's prompt to our secure Netlify function.
 async function sendText(prompt: string) {
-  const spinner = document.querySelector('#spinner');
-  const errorMessage = document.querySelector('#error-message');
-  const buttonEl = document.getElementById('generate') as HTMLButtonElement;
+  const buttonEl = generateButton as HTMLButtonElement;
 
   spinner.classList.remove('util-hidden');
   errorMessage.innerHTML = '';
@@ -153,8 +163,6 @@ async function sendText(prompt: string) {
       );
       createTimeline();
       showTimeline();
-      const timelineToggle = document.querySelector('#timeline-toggle');
-      const timelineFooter = document.querySelector('#timeline-footer');
       if (timelineToggle) {
         timelineToggle.classList.remove('util-hidden');
       }
@@ -171,7 +179,7 @@ async function sendText(prompt: string) {
     errorMessage.innerHTML = "Failed to connect to the planning service. Ensure the Netlify URL is correct in the code. " + e.message;
     console.error('Error sending prompt:', e);
   } finally {
-    buttonEl.classList.remove('loading');
+    if (buttonEl) buttonEl.classList.remove('loading');
     spinner.classList.add('util-hidden');
   }
 }
@@ -259,7 +267,6 @@ async function setLeg(args) {
 
 // Creates and populates the timeline view for the day plan.
 function createTimeline() {
-  const timeline = document.querySelector('#timeline') as HTMLDivElement;
   if (!timeline || dayPlanItinerary.length === 0) return;
   timeline.innerHTML = '';
   dayPlanItinerary.forEach((item, index) => {
@@ -382,10 +389,6 @@ function getPlaceholderImage(locationName: string): string {
 
 // Creates and displays location cards in the carousel.
 function createLocationCards() {
-  const cardContainer = document.querySelector('#card-container') as HTMLDivElement;
-  const carouselIndicators = document.querySelector('#carousel-indicators') as HTMLDivElement;
-  const cardCarousel = document.querySelector('.card-carousel') as HTMLDivElement;
-  
   if (!cardContainer || !carouselIndicators || popUps.length === 0) return;
   cardContainer.innerHTML = '';
   carouselIndicators.innerHTML = '';
@@ -438,8 +441,6 @@ function createLocationCards() {
 // Highlights the selected card and corresponding elements.
 function highlightCard(index: number) {
   activeCardIndex = index;
-  const cardContainer = document.querySelector('#card-container') as HTMLDivElement;
-  const carouselIndicators = document.querySelector('#carousel-indicators') as HTMLDivElement;
   const cards = cardContainer?.querySelectorAll('.location-card');
   if (!cards) return;
 
@@ -475,7 +476,6 @@ function highlightCard(index: number) {
 
 // Highlights the timeline item corresponding to the selected card.
 function highlightTimelineItem(cardIndex: number) {
-  const timeline = document.querySelector('#timeline') as HTMLDivElement;
   if (!timeline) return;
   const timelineItems = timeline.querySelectorAll('.timeline-content:not(.transport)');
   timelineItems.forEach((item) => item.classList.remove('active'));
@@ -712,41 +712,28 @@ async function exportDayPlan() {
   }
 }
 
-// Wait until the DOM is fully loaded before running any script that interacts with it.
-document.addEventListener('DOMContentLoaded', () => {
+// Unified handler for submitting the prompt from either button click or Enter key.
+function handlePromptSubmission() {
+  const prompt = promptInput.value;
+  if (!prompt.trim()) return; // Do not submit empty prompts
 
-  // DOM Element references
-  const generateButton = document.querySelector('#generate');
-  const prevCardButton = document.querySelector('#prev-card') as HTMLButtonElement;
-  const nextCardButton = document.querySelector('#next-card') as HTMLButtonElement;
-  const closeTimelineButton = document.querySelector('#close-timeline') as HTMLButtonElement;
-  const timelineToggle = document.querySelector('#timeline-toggle');
-  const mapOverlay = document.querySelector('#map-overlay');
-  const exportPlanButton = document.querySelector('#export-plan') as HTMLButtonElement;
-  const mapElement = document.getElementById('map');
-  const mapErrorElement = document.getElementById('map-error');
-  const promptInput = document.querySelector('#prompt-input') as HTMLTextAreaElement;
+  const buttonEl = generateButton as HTMLButtonElement;
+  buttonEl.classList.add('loading');
 
+  // Clear and reset textarea UI immediately for better perceived performance
+  promptInput.value = '';
+  promptInput.style.height = '36px'; // Reset height to default
+
+  // Use a small timeout to allow the UI to update before starting the network request
+  setTimeout(() => {
+    sendText(prompt);
+  }, 10);
+}
+
+// Main app initialization function
+function initializeApp() {
   // Set initial placeholder, as Planner Mode is always on.
   promptInput.placeholder = "Plan a dog-friendly day in... (e.g. 'Austin, TX')";
-
-  // Unified handler for submitting the prompt from either button click or Enter key.
-  function handlePromptSubmission() {
-    const prompt = promptInput.value;
-    if (!prompt.trim()) return; // Do not submit empty prompts
-
-    const buttonEl = generateButton as HTMLButtonElement;
-    buttonEl.classList.add('loading');
-
-    // Clear and reset textarea UI immediately for better perceived performance
-    promptInput.value = '';
-    promptInput.style.height = '36px'; // Reset height to default
-
-    // Use a small timeout to allow the UI to update before starting the network request
-    setTimeout(() => {
-      sendText(prompt);
-    }, 10);
-  }
 
   // Event Listeners for UI elements.
   if (promptInput) {
@@ -790,23 +777,19 @@ document.addEventListener('DOMContentLoaded', () => {
     exportPlanButton.addEventListener('click', () => exportDayPlan());
   }
 
-  // Main app initialization function
-  function initializeApp() {
-    try {
-      // Check if Leaflet is loaded
-      if (typeof L === 'undefined') {
-        throw new Error("Leaflet.js failed to load.");
-      }
-      initMap(mapElement, mapErrorElement);
-    } catch (error) {
-      console.error("Map failed to load. The app will run without map features.", error);
-      if (mapErrorElement) mapErrorElement.classList.remove('util-hidden');
-      if (mapElement) mapElement.classList.add('util-hidden');
-      isMapInitialized = false;
+  try {
+    // Check if Leaflet is loaded
+    if (typeof L === 'undefined') {
+      throw new Error("Leaflet.js failed to load.");
     }
+    initMap(mapElement, mapErrorElement);
+  } catch (error) {
+    console.error("Map failed to load. The app will run without map features.", error);
+    if (mapErrorElement) mapErrorElement.classList.remove('util-hidden');
+    if (mapElement) mapElement.classList.add('util-hidden');
+    isMapInitialized = false;
   }
+}
 
-  // Start the application
-  initializeApp();
-});
-
+// Start the application
+initializeApp();
