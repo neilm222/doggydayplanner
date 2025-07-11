@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
 */
 
-import jsPDF from 'jspdf';
+import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
 
 // Declare Leaflet.js library (loaded from CDN in index.html)
@@ -644,3 +644,4 @@ function initializeApp() {
 // This is a more robust way to prevent race conditions where the script
 // tries to access DOM elements that haven't been created yet.
 document.addEventListener('DOMContentLoaded', initializeApp);
+
