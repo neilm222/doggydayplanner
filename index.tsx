@@ -501,10 +501,14 @@ async function exportDayPlan() {
   exportButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Exporting...';
 
   try {
-    const canvas = await html2canvas(timeline as HTMLElement, {
+    const timelineEl = timeline as HTMLElement;
+    const canvas = await html2canvas(timelineEl, {
         scale: 2, // Increase scale for better resolution
         useCORS: true, // If any images are from other origins
         backgroundColor: '#ffffff',
+        // Explicitly set the height and window height to capture the full scrollable content
+        height: timelineEl.scrollHeight,
+        windowHeight: timelineEl.scrollHeight,
     });
 
     const imgData = canvas.toDataURL('image/png');
