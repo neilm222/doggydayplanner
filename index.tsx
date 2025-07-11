@@ -819,5 +819,7 @@ function initializeApp() {
   }
 }
 
-// Start the application
-initializeApp();
+// Start the application once the DOM is fully loaded.
+// This is a more robust way to prevent race conditions where the script
+// tries to access DOM elements that haven't been created yet.
+document.addEventListener('DOMContentLoaded', initializeApp);
