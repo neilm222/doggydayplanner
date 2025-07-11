@@ -490,20 +490,6 @@ function navigateCards(direction: number) {
   }
 }
 
-// Helper to get a transport emoji for the PDF
-function getTransportEmoji(transportType: string): string {
-    const type = (transportType || '').toLowerCase();
-    if (type.includes('walk')) return '🚶';
-    if (type.includes('car') || type.includes('driv')) return '🚗';
-    if (type.includes('bus') || type.includes('transit') || type.includes('public')) return '🚌';
-    if (type.includes('train') || type.includes('subway') || type.includes('metro')) return '🚆';
-    if (type.includes('bike') || type.includes('cycl')) return '🚲';
-    if (type.includes('taxi') || type.includes('cab')) return '🚕';
-    if (type.includes('boat') || type.includes('ferry')) return '🚢';
-    if (type.includes('plane') || type.includes('fly')) return '✈️';
-    return '➡️'; // Default emoji
-}
-
 // Manually draws the itinerary on the PDF, handling page breaks.
 function drawItineraryOnPdf(doc: jsPDF, fullItinerary: any[]) {
     let y = 40; // Initial y position
@@ -572,8 +558,8 @@ function drawItineraryOnPdf(doc: jsPDF, fullItinerary: any[]) {
             // Draw content
             doc.setFontSize(12);
             doc.setFont('helvetica', 'bold');
-            const emoji = getTransportEmoji(data.transport);
-            doc.text(`${emoji} ${data.transport || 'Travel'}`, contentX, y);
+            const transportText = (data.transport || 'Travel').charAt(0).toUpperCase() + (data.transport || 'Travel').slice(1);
+            doc.text(transportText, contentX, y);
             
             doc.setFontSize(10);
             doc.setFont('helvetica', 'normal');
@@ -598,6 +584,8 @@ function drawItineraryOnPdf(doc: jsPDF, fullItinerary: any[]) {
     });
 }
 
+// Helper function to introduce a delay.
+const delay = (ms: number) => new Promise(res => setTimeout(res, ms));
 
 // Exports the day plan timeline to a PDF document.
 async function exportDayPlan() {
@@ -609,6 +597,10 @@ async function exportDayPlan() {
     try {
         const mapEl = document.getElementById('map');
         if (!mapEl) throw new Error('Map element not found');
+        
+        // Force map redraw and wait for layers to render before capture.
+        if (map) map.invalidateSize();
+        await delay(300);
 
         // 1. Capture Map
         const mapCanvas = await html2canvas(mapEl, { useCORS: true });
