@@ -1,19 +1,16 @@
-# This file configures how Netlify builds and deploys your site.
+# This file provides explicit build instructions for Netlify,
+# ensuring a consistent and successful deployment.
 
 [build]
-  # This command is run to build the site. It executes the "build" script
-  # from your package.json file.
+  # This command tells Netlify to run the "build" script defined in your package.json.
+  # It will use esbuild to compile index.tsx into index.js.
   command = "npm run build"
-  
-  # The directory that contains the deploy-ready assets after the build
-  # command has been run. For this project, it's the root directory.
-  publish = "."
-  
-  # The directory where your serverless functions are located.
-  functions = "netlify/functions"
 
-# Configuration for your serverless functions.
+  # This specifies the directory that Netlify will deploy.
+  # Since your index.html and generated index.js are in the root, we use ".".
+  publish = "."
+
 [functions]
-  # This tells Netlify to use the 'esbuild' bundler for your TypeScript 
-  # function. It's generally faster and works well with TypeScript.
-  node_bundler = "esbuild"
+  # This tells Netlify where to find your serverless functions.
+  directory = "netlify/functions"
+  
