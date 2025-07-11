@@ -500,15 +500,25 @@ async function exportDayPlan() {
   exportButton.disabled = true;
   exportButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Exporting...';
 
+  const timelineEl = timeline as HTMLElement;
+  // Store original styles to restore them later
+  const originalStyles = {
+    height: timelineEl.style.height,
+    overflowY: timelineEl.style.overflowY,
+  };
+
   try {
-    const timelineEl = timeline as HTMLElement;
+    // Temporarily modify styles to ensure the full content is rendered
+    timelineEl.style.height = `${timelineEl.scrollHeight}px`;
+    timelineEl.style.overflowY = 'visible';
+    
+    // Allow a very brief moment for the browser to apply the style changes
+    await new Promise(resolve => setTimeout(resolve, 50));
+
     const canvas = await html2canvas(timelineEl, {
-        scale: 2, // Increase scale for better resolution
-        useCORS: true, // If any images are from other origins
-        backgroundColor: '#ffffff',
-        // Explicitly set the height and window height to capture the full scrollable content
-        height: timelineEl.scrollHeight,
-        windowHeight: timelineEl.scrollHeight,
+      scale: 2, // Increase scale for better resolution
+      useCORS: true,
+      backgroundColor: '#ffffff',
     });
 
     const imgData = canvas.toDataURL('image/png');
@@ -525,15 +535,24 @@ async function exportDayPlan() {
     const ratio = canvasWidth / canvasHeight;
 
     const width = pdfWidth - 40; // With margins
-    const height = width / ratio;
+    let height = width / ratio;
+
+    // Check if content exceeds page height
+    if (height > pdfHeight - 60) {
+      height = pdfHeight - 60; // Fit to page with margin
+    }
 
     pdf.text("Your Doggy Day Plan", 20, 30);
     pdf.addImage(imgData, 'PNG', 20, 50, width, height);
     pdf.save('doggy-day-plan.pdf');
+
   } catch (error) {
     console.error('Failed to export PDF:', error);
     if(errorMessage) errorMessage.textContent = 'Could not generate PDF. An error occurred.';
   } finally {
+    // Crucially, restore the original styles
+    timelineEl.style.height = originalStyles.height;
+    timelineEl.style.overflowY = originalStyles.overflowY;
     exportButton.disabled = false;
     exportButton.innerHTML = buttonOriginalText;
   }
