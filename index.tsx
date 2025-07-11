@@ -5,6 +5,10 @@
 import {jsPDF} from 'jspdf';
 import html2canvas from 'html2canvas';
 
+// AGGRESSIVE DEBUGGING: Check if the script is running at all on Netlify.
+// If this alert appears on the live site, the build is working.
+alert('Doggy Day Planner script is executing!');
+
 // Declare Leaflet.js library (loaded from CDN in index.html)
 declare const L: any;
 
