@@ -1,0 +1,8 @@
+{
+  "name": "doggy-day-planner",
+  "version": "1.0.0",
+  "private": true,
+  "dependencies": {
+    "@google/genai": "^0.7.0"
+  }
+}
