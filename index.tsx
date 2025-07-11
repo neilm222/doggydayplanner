@@ -5,10 +5,6 @@
 import {jsPDF} from 'jspdf';
 import html2canvas from 'html2canvas';
 
-// AGGRESSIVE DEBUGGING: Check if the script is running at all on Netlify.
-// If this alert appears on the live site, the build is working.
-alert('Doggy Day Planner script is executing!');
-
 // Declare Leaflet.js library (loaded from CDN in index.html)
 declare const L: any;
 
@@ -817,9 +813,6 @@ function initializeApp() {
     }
   } catch (error) {
     console.error("CRITICAL MAP FAILURE:", error);
-    // Use alert for high-visibility debugging on the deployed site.
-    alert(`A critical error occurred while loading the map: ${error.message}. Please check the browser console for more details.`);
-
     if (mapErrorElement) mapErrorElement.classList.remove('util-hidden');
     if (mapElement) mapElement.classList.add('util-hidden');
     isMapInitialized = false;
