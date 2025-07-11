@@ -120,8 +120,8 @@ async function sendText(prompt: string) {
   restart();
 
   try {
-    // Use the absolute URL for the Netlify function, allowing calls from other domains.
-    const response = await fetch('https://comforting-biscotti-21b51e.netlify.app/.netlify/functions/generate', {
+    // Use a relative URL for the Netlify function for better portability.
+    const response = await fetch('/.netlify/functions/generate', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
