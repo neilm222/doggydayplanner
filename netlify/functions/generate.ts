@@ -134,10 +134,24 @@ Your primary goal is to answer any location-related query by providing ONLY dog-
 
 // Netlify function handler
 export default async (req: Request) => {
+  // CORS headers to allow requests from any origin. This is necessary because the
+  // frontend is on gizmopup.com and the backend is on netlify.app.
+  const headers = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type',
+    'Content-Type': 'application/json',
+  };
+
+  // Handle preflight CORS request sent by browsers.
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { status: 204, headers });
+  }
+
   if (req.method !== 'POST') {
     return new Response(JSON.stringify({ error: 'Method not allowed' }), {
       status: 405,
-      headers: { 'Content-Type': 'application/json' },
+      headers: headers,
     });
   }
 
@@ -146,7 +160,7 @@ export default async (req: Request) => {
     if (!prompt) {
       return new Response(JSON.stringify({ error: 'Prompt is required' }), {
         status: 400,
-        headers: { 'Content-Type': 'application/json' },
+        headers: headers,
       });
     }
     
@@ -180,14 +194,14 @@ export default async (req: Request) => {
     // Send the function calls back to the client
     return new Response(JSON.stringify({ functionCalls }), {
       status: 200,
-      headers: { 'Content-Type': 'application/json' },
+      headers: headers,
     });
 
   } catch (error) {
     console.error('Error in Netlify function:', error);
     return new Response(JSON.stringify({ error: 'Internal server error', details: error.message }), {
       status: 500,
-      headers: { 'Content-Type': 'application/json' },
+      headers: headers,
     });
   }
 };
