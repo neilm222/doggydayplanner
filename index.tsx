@@ -111,8 +111,15 @@ async function sendText(prompt: string) {
   restart();
 
   try {
-    // Use a relative URL for the Netlify function for better portability.
-    const response = await fetch('/.netlify/functions/generate', {
+    // Determine the base URL for the API call.
+    // If the app is running on a netlify.app domain, use a relative path.
+    // Otherwise, use the full absolute path for external hosting.
+    const isNetlify = window.location.hostname.endsWith('netlify.app');
+    const functionUrl = isNetlify
+      ? '/.netlify/functions/generate'
+      : 'https://doggydayplanner-upgrade.netlify.app/.netlify/functions/generate';
+
+    const response = await fetch(functionUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -128,7 +135,10 @@ async function sendText(prompt: string) {
     }
     
     const data = await response.json();
-    const functionCalls = data.functionCalls || [];
+    
+    // The Gemini API returns function calls within the 'parts' of the first candidate's content.
+    // This is the robust way to extract them.
+    const functionCalls = data.functionCalls ?? [];
 
     if (functionCalls.length === 0) {
       throw new Error(
