@@ -43,15 +43,10 @@ const locationFunctionDeclaration: FunctionDeclaration = {
         type: Type.NUMBER,
         description: 'Order in the day itinerary (1 = first stop of the day).',
       },
-      image_generation_prompt: {
-        type: Type.STRING,
-        description:
-          'A short, vivid, and picturesque prompt for an image generation model, describing a beautiful, dog-friendly scene at this location. Example: "A golden retriever joyfully running on the sandy shore of a dog-friendly beach on a sunny day."',
-      },
     },
     // By making most fields optional, we improve the reliability of the function calling.
     // The system prompt still strongly encourages the model to provide all fields.
-    required: ['name', 'description', 'lat', 'lng', 'image_generation_prompt'],
+    required: ['name', 'description', 'lat', 'lng'],
   },
 };
 
@@ -115,7 +110,6 @@ const systemInstructions = `You are a helpful assistant that creates dog-friendl
 - Your primary goal is to respond to user queries by creating a detailed, dog-friendly day plan.
 - **STRICT RULE**: Only include locations that are verifiably dog-friendly. If unsure, do not include them.
 - You **MUST** use the 'location' and 'line' functions to structure your response.
-- For each 'location', you **MUST** provide a creative 'image_generation_prompt'.
 - For the best user experience, you should ideally include a logical sequence, times, durations, and travel details for the itinerary.`;
 
 // Netlify function handler
@@ -175,44 +169,7 @@ export default async (req: Request) => {
 
     const functionCalls = response.functionCalls ?? [];
     
-    // Check if there are any function calls to process
-    if (functionCalls.length > 0) {
-      const processedCalls = await Promise.all(
-        functionCalls.map(async (call) => {
-          // Only process 'location' calls that should have an image prompt
-          if (call.name === 'location' && call.args.image_generation_prompt) {
-            try {
-              const imageResponse = await ai.models.generateImages({
-                model: 'imagen-3.0-generate-002',
-                prompt: `${call.args.image_generation_prompt}, dog-friendly, photorealistic, high quality`,
-                config: {
-                  numberOfImages: 1,
-                  outputMimeType: 'image/jpeg',
-                  aspectRatio: '16:9',
-                },
-              });
-
-              if (imageResponse.generatedImages?.length > 0) {
-                const base64ImageBytes = imageResponse.generatedImages[0].image.imageBytes;
-                // Add the image data to the arguments of the function call
-                call.args.imageBase64 = base64ImageBytes;
-              }
-            } catch (error) {
-              console.error(`Image generation failed for ${call.args.name}:`, error);
-              // Continue without image data if generation fails
-            }
-          }
-          return call; // Return the call, modified or not
-        })
-      );
-
-      return new Response(JSON.stringify({ functionCalls: processedCalls }), {
-        status: 200,
-        headers: headers,
-      });
-    }
-
-    // Send the (unmodified) function calls back to the client
+    // Send the function calls back to the client
     return new Response(JSON.stringify({ functionCalls }), {
       status: 200,
       headers: headers,
@@ -226,4 +183,3 @@ export default async (req: Request) => {
     });
   }
 };
-

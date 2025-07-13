@@ -18,7 +18,8 @@
 </script>
     <!-- Leaflet.js JavaScript library -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  </head>
+  <link rel="stylesheet" href="/index.css">
+</head>
   <body>
     <header class="app-header">
        <!-- App logo icon -->
@@ -58,23 +59,6 @@
 
         <div id="map"></div>
 
-        <!-- Carousel for displaying location cards at the bottom -->
-        <div class="card-carousel">
-          <div class="card-container" id="card-container">
-            <!-- Location cards will be dynamically inserted here by the script -->
-          </div>
-          <div class="carousel-controls">
-            <button class="carousel-arrow prev" id="prev-card">
-              <i class="fas fa-chevron-left"></i>
-            </button>
-            <div class="carousel-indicators" id="carousel-indicators">
-              <!-- Indicator dots will be added dynamically -->
-            </div>
-            <button class="carousel-arrow next" id="next-card">
-              <i class="fas fa-chevron-right"></i>
-            </button>
-          </div>
-        </div>
       </div>
 
       <!-- Semi-transparent overlay displayed when timeline is open on mobile -->
@@ -110,8 +94,9 @@
     <div id="spinner" class="util-hidden spinner"></div>
     
     <!-- Version marker for debugging deployment issues -->
-    <div class="version-marker">v15.0</div>
+    <div class="version-marker">v13.0</div>
 
     <script type="module" src="index.js"></script>
-  </body>
+  <script type="module" src="/index.tsx"></script>
+</body>
 </html>

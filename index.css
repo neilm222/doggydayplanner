@@ -1,6 +1,7 @@
 
 
 
+
 @import url(https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css);
 
 /* Global reset and base font styles */
@@ -204,128 +205,6 @@ body {
   flex-basis: 100%;
 }
 
-/* Card Carousel Styles */
-.card-carousel {
-  position: absolute;
-  bottom: 20px;
-  left: 0;
-  width: 100%;
-  z-index: 10;
-  display: none; /* Hidden by default, shown by JS */
-}
-
-.card-container {
-  display: flex;
-  overflow-x: auto;
-  scroll-snap-type: x mandatory;
-  scroll-behavior: smooth;
-  padding: 10px 20px;
-  gap: 16px;
-  -ms-overflow-style: none;  /* IE and Edge */
-  scrollbar-width: none;  /* Firefox */
-}
-
-.card-container::-webkit-scrollbar {
-  display: none; /* Chrome, Safari, Opera */
-}
-
-.location-card {
-  flex: 0 0 80%;
-  max-width: 300px;
-  scroll-snap-align: center;
-  background-color: white;
-  border-radius: 12px;
-  box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-  overflow: hidden;
-  transition: transform 0.3s, box-shadow 0.3s, opacity 0.3s;
-  cursor: pointer;
-  opacity: 0.7;
-  transform: scale(0.95);
-}
-
-.location-card.card-active {
-  opacity: 1;
-  transform: scale(1);
-  box-shadow: 0 6px 20px rgba(33, 150, 243, 0.4);
-}
-
-.card-image {
-  height: 120px;
-  background-size: cover;
-  background-position: center;
-}
-
-.card-content {
-  padding: 12px 16px;
-}
-
-.card-title {
-  font-size: 16px;
-  font-weight: 600;
-  color: #333;
-  margin-bottom: 4px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.card-description {
-  font-size: 13px;
-  color: #666;
-  line-height: 1.4;
-  margin-bottom: 8px;
-  display: -webkit-box;
-  -webkit-line-clamp: 3;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.card-coordinates {
-  font-size: 11px;
-  color: #999;
-}
-
-/* Carousel Controls */
-.carousel-controls {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  margin-top: 8px;
-  gap: 12px;
-}
-
-.carousel-arrow {
-  background-color: rgba(255,255,255,0.9);
-  border: 1px solid #ddd;
-  border-radius: 50%;
-  width: 32px;
-  height: 32px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #555;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.1);
-}
-
-.carousel-indicators {
-  display: flex;
-  gap: 8px;
-}
-
-.carousel-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background-color: #ccc;
-  transition: background-color 0.3s;
-}
-
-.carousel-dot.active {
-  background-color: #2196F3;
-}
-
 /* App Logo Icon */
 .app-logo {
   position: static;
@@ -340,52 +219,6 @@ body {
   align-items: center;
   justify-content: center;
   font-size: 20px;
-}
-
-/* Specific styles for location cards when in day planner mode */
-.location-card.day-planner-card {
-  position: relative;
-}
-
-.card-time-badge {
-  position: absolute;
-  top: 10px;
-  right: 10px;
-  background-color: rgba(0, 0, 0, 0.7);
-  color: white;
-  padding: 4px 8px;
-  border-radius: 16px;
-  font-size: 12px;
-  font-weight: 500;
-  z-index: 2;
-}
-
-.card-sequence-badge {
-  position: absolute;
-  top: 10px;
-  left: 10px;
-  background-color: #2196F3;
-  color: white;
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 12px;
-  font-weight: 600;
-  z-index: 2;
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
-}
-
-.card-duration {
-  display: inline-block;
-  font-size: 11px;
-  color: #2196F3;
-  background-color: #e3f2fd;
-  padding: 2px 6px;
-  border-radius: 4px;
-  margin-top: 4px;
 }
 
 /* Styles for the timeline panel (Desktop-first: flex item) */
@@ -628,7 +461,7 @@ body.timeline-visible .map-overlay {
 /* Mobile-only button to re-open the timeline */
 .timeline-toggle {
   position: fixed;
-  bottom: 90px; /* Position above card carousel */
+  bottom: 20px; /* Position above card carousel */
   right: 20px;
   width: 50px;
   height: 50px;
@@ -732,19 +565,6 @@ body.timeline-visible .timeline-toggle {
     max-width: 320px; /* Adjust for phone sizes */
   }
 
-  .card-carousel {
-    bottom: 10px;
-  }
-  
-  .card-container {
-    padding: 10px 15px;
-    scroll-padding: 0 5%;
-  }
-
-  .location-card {
-    flex: 0 0 90%;
-  }
-
   .timeline-header .close-button .btn-text {
     display: none;
   }
@@ -764,4 +584,3 @@ body.timeline-visible .timeline-toggle {
   padding: 2px 4px;
   border-radius: 3px;
 }
-

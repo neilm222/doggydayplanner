@@ -18,13 +18,10 @@ let markers = []; // Array to store map markers (Leaflet)
 let lines = []; // Array to store polylines representing routes/connections (Leaflet)
 let popUps = []; // Array to store location info including markers and content
 let bounds; // Leaflet LatLngBounds object to fit map around points
-let activeCardIndex = 0; // Index of the currently selected location card
 let dayPlanItinerary = []; // Array to hold structured items for the day plan timeline
 
 // --- DOM Element References (declared here, assigned in initializeApp) ---
 let generateButton: Element | null;
-let prevCardButton: HTMLButtonElement | null;
-let nextCardButton: HTMLButtonElement | null;
 let closeTimelineButton: HTMLButtonElement | null;
 let timelineToggle: Element | null;
 let mapOverlay: Element | null;
@@ -33,9 +30,6 @@ let mapErrorElement: HTMLElement | null;
 let promptInput: HTMLTextAreaElement | null;
 let errorMessage: Element | null;
 let timelineFooter: Element | null;
-let cardContainer: Element | null;
-let carouselIndicators: Element | null;
-let cardCarousel: HTMLDivElement | null;
 let timeline: Element | null;
 let exportButton: HTMLButtonElement | null;
 
@@ -103,9 +97,6 @@ function restart() {
   lines = [];
   popUps = [];
 
-  if (cardContainer) cardContainer.innerHTML = '';
-  if (carouselIndicators) carouselIndicators.innerHTML = '';
-  if (cardCarousel) cardCarousel.style.display = 'none';
   if (timeline) timeline.innerHTML = '';
   if (document.body.classList.contains('timeline-visible')) {
     hideTimeline();
@@ -120,8 +111,8 @@ async function sendText(prompt: string) {
   restart();
 
   try {
-    // Use the absolute URL for the Netlify function to allow hosting on a different domain (e.g., Hostinger).
-    const response = await fetch('https://comforting-biscotti-21b51e.netlify.app/.netlify/functions/generate', {
+    // Use a relative URL for the Netlify function for better portability.
+    const response = await fetch('/.netlify/functions/generate', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -168,7 +159,6 @@ async function sendText(prompt: string) {
         timelineFooter.classList.remove('util-hidden');
       }
     }
-    createLocationCards();
     if(isMapInitialized && bounds.isValid()){
       map.fitBounds(bounds, {padding: [50, 50]});
     }
@@ -202,7 +192,6 @@ async function setPin(args) {
     duration: args.duration,
     sequence: args.sequence,
     popupContent: popupContent,
-    imageBase64: args.imageBase64, // Store the new image data
   };
 
   if (isMapInitialized) {
@@ -288,8 +277,19 @@ function createTimeline() {
       timelineContent.addEventListener('click', () => {
         const popupIndex = popUps.findIndex((p) => p.name === item.name);
         if (popupIndex !== -1) {
-          highlightCard(popupIndex);
-          if (isMapInitialized) map.panTo(popUps[popupIndex].position);
+          highlightTimelineItem(popupIndex);
+          if (isMapInitialized) {
+            popUps.forEach((location, i) => {
+              if (location.marker) {
+                if (i === popupIndex) {
+                  location.marker.openPopup();
+                } else {
+                  location.marker.closePopup();
+                }
+              }
+            });
+            map.panTo(popUps[popupIndex].position);
+          }
         }
       });
     }
@@ -315,8 +315,8 @@ function createTimeline() {
       if (connectingLine && (connectingLine.transport || connectingLine.travelTime)) {
         const transportItem = document.createElement('div');
         transportItem.className = 'timeline-item transport-item';
-        // Use plain text for transport to prevent garbled emojis in PDF and for a cleaner UI.
-        const transportText = (connectingLine.transport || 'Travel').charAt(0).toUpperCase() + (connectingLine.transport || 'Travel').slice(1);
+        // Use emoji for transport icon for better PDF compatibility
+        const transportIcon = getTransportIcon(connectingLine.transport || 'travel');
         transportItem.innerHTML = `
           <div class="timeline-time"></div>
           <div class="timeline-connector">
@@ -325,7 +325,8 @@ function createTimeline() {
           </div>
           <div class="timeline-content transport">
             <div class="timeline-title">
-              ${transportText}
+              ${transportIcon}
+              ${connectingLine.transport || 'Travel'}
             </div>
             <div class="timeline-description">${connectingLine.name}</div>
             ${connectingLine.travelTime ? `<div class="timeline-duration">${connectingLine.travelTime}</div>` : ''}
@@ -337,113 +338,20 @@ function createTimeline() {
   }
 }
 
-// Generates a placeholder SVG image for location cards.
-function getPlaceholderImage(locationName: string): string {
-  let hash = 0;
-  for (let i = 0; i < locationName.length; i++) {
-    hash = locationName.charCodeAt(i) + ((hash << 5) - hash);
-  }
-  const hue = hash % 360;
-  const saturation = 60 + (hash % 30);
-  const lightness = 50 + (hash % 20);
-  const letter = locationName.charAt(0).toUpperCase() || '?';
-  return `data:image/svg+xml,${encodeURIComponent(`
-    <svg xmlns="http://www.w3.org/2000/svg" width="300" height="180" viewBox="0 0 300 180">
-      <rect width="300" height="180" fill="hsl(${hue}, ${saturation}%, ${lightness}%)" />
-      <text x="150" y="95" font-family="Arial, sans-serif" font-size="72" fill="white" text-anchor="middle" dominant-baseline="middle">${letter}</text>
-    </svg>
-  `)}`;
-}
-
-// Creates and displays location cards in the carousel.
-function createLocationCards() {
-  if (!cardContainer || !carouselIndicators || !cardCarousel || popUps.length === 0) return;
-  cardContainer.innerHTML = '';
-  carouselIndicators.innerHTML = '';
-  cardCarousel.style.display = 'block';
-
-  popUps.forEach((location, index) => {
-    const card = document.createElement('div');
-    card.className = 'location-card';
-    card.classList.add('day-planner-card'); // Always add planner styles
-    if (index === 0) card.classList.add('card-active');
-
-    // Use generated image if available, otherwise use placeholder as a fallback.
-    const imageUrl = location.imageBase64
-      ? `data:image/jpeg;base64,${location.imageBase64}`
-      : getPlaceholderImage(location.name);
-
-    let cardContent = `<div class="card-image" style="background-image: url('${imageUrl}')"></div>`;
-
-    if (location.sequence) cardContent += `<div class="card-sequence-badge">${location.sequence}</div>`;
-    if (location.time) cardContent += `<div class="card-time-badge">${location.time}</div>`;
-
-    const {lat, lng} = location.position;
-    cardContent += `
-      <div class="card-content">
-        <h3 class="card-title">${location.name}</h3>
-        <p class="card-description">${location.description}</p>
-        ${location.duration ? `<div class="card-duration">${location.duration}</div>` : ''}
-        <div class="card-coordinates">
-          ${lat.toFixed(5)}, ${lng.toFixed(5)}
-        </div>
-      </div>
-    `;
-    card.innerHTML = cardContent;
-
-    card.addEventListener('click', () => {
-      highlightCard(index);
-      if (isMapInitialized) map.panTo(location.position);
-      if (document.querySelector('#timeline')) highlightTimelineItem(index);
-    });
-
-    cardContainer.appendChild(card);
-
-    const dot = document.createElement('div');
-    dot.className = 'carousel-dot';
-    if (index === 0) dot.classList.add('active');
-    carouselIndicators.appendChild(dot);
-  });
-
-  if (cardCarousel && popUps.length > 0) {
-    cardCarousel.style.display = 'block';
-  }
-}
-
-// Highlights the selected card and corresponding elements.
-function highlightCard(index: number) {
-  activeCardIndex = index;
-  const cards = cardContainer?.querySelectorAll('.location-card');
-  if (!cards || !cardContainer) return;
-
-  cards.forEach((card) => card.classList.remove('card-active'));
-  if (cards[index]) {
-    const activeCard = cards[index] as HTMLElement;
-    activeCard.classList.add('card-active');
-    const cardWidth = activeCard.offsetWidth;
-    const containerWidth = (cardContainer as HTMLElement).offsetWidth;
-    const scrollPosition = activeCard.offsetLeft - containerWidth / 2 + cardWidth / 2;
-    (cardContainer as HTMLElement).scrollTo({left: scrollPosition, behavior: 'smooth'});
-  }
-
-  const dots = carouselIndicators?.querySelectorAll('.carousel-dot');
-  if (dots) {
-    dots.forEach((dot, i) => dot.classList.toggle('active', i === index));
-  }
-
-  if (isMapInitialized) {
-    popUps.forEach((location, i) => {
-      if (location.marker) {
-        if(i === index) {
-            location.marker.openPopup();
-        } else {
-            location.marker.closePopup();
-        }
-      }
-    });
-  }
-
-  highlightTimelineItem(index);
+// Returns an appropriate Font Awesome icon class or emoji based on transport type.
+function getTransportIcon(transportType: string): string {
+  const type = (transportType || '').toLowerCase();
+    
+  // Return Font Awesome class
+  if (type.includes('walk')) return `<i class="fas fa-walking"></i>`;
+  if (type.includes('car') || type.includes('driv')) return `<i class="fas fa-car-side"></i>`;
+  if (type.includes('bus') || type.includes('transit') || type.includes('public')) return `<i class="fas fa-bus-alt"></i>`;
+  if (type.includes('train') || type.includes('subway') || type.includes('metro')) return `<i class="fas fa-train"></i>`;
+  if (type.includes('bike') || type.includes('cycl')) return `<i class="fas fa-bicycle"></i>`;
+  if (type.includes('taxi') || type.includes('cab')) return `<i class="fas fa-taxi"></i>`;
+  if (type.includes('boat') || type.includes('ferry')) return `<i class="fas fa-ship"></i>`;
+  if (type.includes('plane') || type.includes('fly')) return `<i class="fas fa-plane-departure"></i>`;
+  return `<i class="fas fa-route"></i>`; // Default icon
 }
 
 // Highlights the timeline item corresponding to the selected card.
@@ -460,15 +368,6 @@ function highlightTimelineItem(cardIndex: number) {
       item.scrollIntoView({behavior: 'smooth', block: 'nearest'});
       break;
     }
-  }
-}
-
-// Allows navigation through cards using arrow buttons.
-function navigateCards(direction: number) {
-  const newIndex = activeCardIndex + direction;
-  if (newIndex >= 0 && newIndex < popUps.length) {
-    highlightCard(newIndex);
-    if (isMapInitialized) map.panTo(popUps[newIndex].position);
   }
 }
 
@@ -663,8 +562,6 @@ function initializeApp() {
   // --- Assign DOM Elements ---
   // This is done here to ensure the DOM is fully loaded before we try to find elements.
   generateButton = document.querySelector('#generate');
-  prevCardButton = document.querySelector('#prev-card') as HTMLButtonElement;
-  nextCardButton = document.querySelector('#next-card') as HTMLButtonElement;
   closeTimelineButton = document.querySelector('#close-timeline') as HTMLButtonElement;
   timelineToggle = document.querySelector('#timeline-toggle');
   mapOverlay = document.querySelector('#map-overlay');
@@ -673,9 +570,6 @@ function initializeApp() {
   promptInput = document.querySelector('#prompt-input') as HTMLTextAreaElement;
   errorMessage = document.querySelector('#error-message');
   timelineFooter = document.querySelector('#timeline-footer');
-  cardContainer = document.querySelector('#card-container');
-  carouselIndicators = document.querySelector('#carousel-indicators');
-  cardCarousel = document.querySelector('.card-carousel') as HTMLDivElement;
   timeline = document.querySelector('#timeline');
   exportButton = document.querySelector('#export-button') as HTMLButtonElement;
   
@@ -711,12 +605,6 @@ function initializeApp() {
     exportButton.addEventListener('click', exportDayPlan);
   }
 
-  if (prevCardButton) {
-    prevCardButton.addEventListener('click', () => navigateCards(-1));
-  }
-  if (nextCardButton) {
-    nextCardButton.addEventListener('click', () => navigateCards(1));
-  }
   if (closeTimelineButton) {
     closeTimelineButton.addEventListener('click', () => hideTimeline());
   }
