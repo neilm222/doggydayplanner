@@ -1,0 +1,16 @@
+# This file provides explicit build instructions for Netlify,
+# ensuring a consistent and successful deployment.
+
+[build]
+  # This command tells Netlify to run the "build" script defined in your package.json.
+  # It will use esbuild to compile index.tsx into index.js.
+  command = "npm run build"
+
+  # This specifies the directory that Netlify will deploy.
+  # Since your index.html and generated index.js are in the root, we use ".".
+  publish = "."
+
+[functions]
+  # This tells Netlify where to find your serverless functions.
+  directory = "netlify/functions"
+  

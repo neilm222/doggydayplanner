@@ -1,0 +1,767 @@
+
+
+
+@import url(https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css);
+
+/* Global reset and base font styles */
+* {
+  box-sizing: border-box;
+  padding: 0;
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell,
+    'Open Sans', 'Helvetica Neue', sans-serif;
+}
+
+html {
+  height: 100%;
+}
+
+body {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  background-color: #f0f0f0;
+}
+
+/* New header containing all top-level controls */
+.app-header {
+  display: flex;
+  align-items: center;
+  padding: 10px 16px;
+  background-color: white;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  z-index: 1010;
+  gap: 16px;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+
+/* New main content area for map and overlays */
+.main-content {
+  flex: 1; /* Use robust flex shorthand */
+  position: relative;
+  display: flex;
+  overflow: hidden; /* Prevent children from spilling out */
+  min-height: 0; /* Add flexbox sizing fix */
+}
+
+/* Utility class to hide elements */
+.util-hidden {
+  display: none !important;
+}
+
+/* Styles for the main map container which holds the map and other UI elements */
+#map-container {
+  color: black;
+  position: relative;
+  flex: 1; /* Use robust flex shorthand */
+  min-width: 0; /* Prevents flexbox from overflowing */
+  overflow: hidden;
+  display: flex;
+}
+
+/* The div where the Leaflet Map will be rendered */
+#map {
+  height: 100%;
+  width: 100%;
+  background-color: #f0f0f0; /* Fallback background for map */
+}
+
+/* Styles for the error message overlay when the map fails to load */
+.map-error-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: #f8f9fa;
+  z-index: 5; /* Above map, below other UI */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  color: #333;
+  padding: 20px;
+}
+
+.map-error-content i {
+  font-size: 48px;
+  color: #6c757d;
+  margin-bottom: 16px;
+}
+
+.map-error-content h3 {
+  font-size: 22px;
+  margin-bottom: 8px;
+  font-weight: 600;
+}
+
+.map-error-content p {
+  font-size: 14px;
+  line-height: 1.5;
+  max-width: 350px;
+}
+
+.map-error-content p:last-of-type {
+  margin-top: 12px;
+  color: #666;
+}
+
+/* Styles for the search input area at the top of the map */
+.search-container {
+  flex-grow: 1;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.search-bar {
+  display: flex;
+  align-items: center;
+  background-color: white;
+  border-radius: 28px;
+  padding: 8px 8px 8px 16px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+  border: 1px solid #ddd;
+  flex-grow: 1;
+  max-width: 600px;
+}
+
+.search-icon {
+  color: #999;
+  margin-right: 12px;
+}
+
+#prompt-input {
+  flex-grow: 1;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-size: 16px;
+  resize: none;
+  height: 36px;
+  line-height: 24px;
+  padding: 0 10px 0 0;
+  color: #333;
+  max-height: 120px; /* Allow growth up to 120px */
+  overflow-y: auto; /* Show scrollbar if content exceeds max-height */
+}
+
+#prompt-input::placeholder {
+  color: #999;
+}
+
+.search-button {
+  background: #2196F3;
+  color: white;
+  border: none;
+  border-radius: 50%;
+  width: 36px;
+  height: 36px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.2s, transform 0.2s;
+  flex-shrink: 0;
+  position: relative;
+}
+
+.search-button:hover {
+  background-color: #1976D2;
+}
+
+.search-button .spinner {
+  display: none;
+  border: 2px solid rgba(255, 255, 255, 0.5);
+  border-top-color: white;
+  border-radius: 50%;
+  width: 18px;
+  height: 18px;
+  animation: spin 0.8s linear infinite;
+}
+
+.search-button.loading .fa-arrow-right {
+  display: none;
+}
+
+.search-button.loading .spinner {
+  display: block;
+}
+
+.error {
+  color: #D32F2F;
+  font-size: 14px;
+  width: 100%;
+  text-align: center;
+  order: 3; /* Ensure error appears below other controls */
+  flex-basis: 100%;
+}
+
+/* Card Carousel Styles */
+.card-carousel {
+  position: absolute;
+  bottom: 20px;
+  left: 0;
+  width: 100%;
+  z-index: 10;
+  display: none; /* Hidden by default, shown by JS */
+}
+
+.card-container {
+  display: flex;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scroll-behavior: smooth;
+  padding: 10px 20px;
+  gap: 16px;
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
+}
+
+.card-container::-webkit-scrollbar {
+  display: none; /* Chrome, Safari, Opera */
+}
+
+.location-card {
+  flex: 0 0 80%;
+  max-width: 300px;
+  scroll-snap-align: center;
+  background-color: white;
+  border-radius: 12px;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+  overflow: hidden;
+  transition: transform 0.3s, box-shadow 0.3s, opacity 0.3s;
+  cursor: pointer;
+  opacity: 0.7;
+  transform: scale(0.95);
+}
+
+.location-card.card-active {
+  opacity: 1;
+  transform: scale(1);
+  box-shadow: 0 6px 20px rgba(33, 150, 243, 0.4);
+}
+
+.card-image {
+  height: 120px;
+  background-size: cover;
+  background-position: center;
+}
+
+.card-content {
+  padding: 12px 16px;
+}
+
+.card-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.card-description {
+  font-size: 13px;
+  color: #666;
+  line-height: 1.4;
+  margin-bottom: 8px;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.card-coordinates {
+  font-size: 11px;
+  color: #999;
+}
+
+/* Carousel Controls */
+.carousel-controls {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-top: 8px;
+  gap: 12px;
+}
+
+.carousel-arrow {
+  background-color: rgba(255,255,255,0.9);
+  border: 1px solid #ddd;
+  border-radius: 50%;
+  width: 32px;
+  height: 32px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #555;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+}
+
+.carousel-indicators {
+  display: flex;
+  gap: 8px;
+}
+
+.carousel-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: #ccc;
+  transition: background-color 0.3s;
+}
+
+.carousel-dot.active {
+  background-color: #2196F3;
+}
+
+/* App Logo Icon */
+.app-logo {
+  position: static;
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background-color: white;
+  color: #2196F3;
+  border: 2px solid #e0e0e0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+}
+
+/* Specific styles for location cards when in day planner mode */
+.location-card.day-planner-card {
+  position: relative;
+}
+
+.card-time-badge {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background-color: rgba(0, 0, 0, 0.7);
+  color: white;
+  padding: 4px 8px;
+  border-radius: 16px;
+  font-size: 12px;
+  font-weight: 500;
+  z-index: 2;
+}
+
+.card-sequence-badge {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  background-color: #2196F3;
+  color: white;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 600;
+  z-index: 2;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+}
+
+.card-duration {
+  display: inline-block;
+  font-size: 11px;
+  color: #2196F3;
+  background-color: #e3f2fd;
+  padding: 2px 6px;
+  border-radius: 4px;
+  margin-top: 4px;
+}
+
+/* Styles for the timeline panel (Desktop-first: flex item) */
+.timeline-container {
+  width: 320px;
+  height: 100%;
+  background-color: rgba(255, 255, 255, 0.98);
+  backdrop-filter: blur(10px);
+  box-shadow: -2px 0 15px rgba(0, 0, 0, 0.1);
+  z-index: 1000;
+  display: none; /* Hidden by default */
+  flex-shrink: 0; /* Prevent from shrinking */
+  flex-direction: column; /* Stack header and content */
+}
+
+/* Show timeline when body has the class */
+body.timeline-visible .timeline-container {
+  display: flex;
+}
+
+/* Styles for the header within the timeline panel */
+.timeline-header {
+  padding: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between; /* Pushes title and actions to opposite ends */
+  border-bottom: 1px solid #eeeeee;
+  background-color: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(5px);
+  z-index: 2;
+  flex-shrink: 0;
+  gap: 12px; /* Add space between title and buttons */
+}
+
+.timeline-header h3 {
+  font-size: 16px;
+  font-weight: 600;
+  color: #333;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0; /* Critical for allowing the title to shrink */
+}
+
+.timeline-actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0; /* Prevent buttons from shrinking */
+}
+
+.close-button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
+  color: #666;
+  display: flex;
+  align-items: center;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: background-color 0.2s;
+}
+
+.close-button i {
+  margin-right: 6px;
+}
+
+.close-button .btn-text {
+  white-space: nowrap;
+}
+
+
+.close-button:hover {
+  background-color: #f0f0f0;
+  color: #333;
+}
+
+/* Container for individual timeline entries */
+.timeline {
+  padding: 0 16px 16px;
+  overflow-y: auto;
+  flex-grow: 1; /* Allow this to fill remaining space */
+}
+
+/* New Footer for the Timeline Panel */
+.timeline-footer {
+  padding: 16px;
+  border-top: 1px solid #eeeeee;
+  background-color: #ffffff;
+  flex-shrink: 0; /* Prevent this from shrinking */
+  z-index: 2;
+}
+
+.timeline-footer .export-button {
+  width: 100%;
+  background-color: #2196F3;
+  color: white;
+  padding: 12px;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 500;
+  justify-content: center;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  transition: background-color 0.2s;
+}
+
+.timeline-footer .export-button:hover {
+  background-color: #1976D2;
+}
+
+.timeline-footer .export-button:disabled {
+  background-color: #cccccc;
+  cursor: not-allowed;
+}
+
+.timeline-footer .export-button i {
+  margin-right: 8px;
+}
+
+
+/* Semi-transparent overlay shown behind the timeline on mobile to dim the map */
+.map-overlay {
+  display: none; /* Only used on smaller screens */
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.5);
+  z-index: 999; /* Below timeline but above map UI */
+  opacity: 0;
+  transition: opacity 0.3s;
+  pointer-events: none;
+}
+
+body.timeline-visible .map-overlay {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* Individual item within the timeline */
+.timeline-item {
+  display: flex;
+  margin: 16px 0;
+  position: relative;
+}
+
+.timeline-time {
+  flex: 0 0 65px;
+  font-weight: 600;
+  color: #333;
+  font-size: 14px;
+  text-align: right;
+  padding-right: 16px;
+  padding-top: 2px;
+}
+
+.timeline-connector {
+  flex: 0 0 20px;
+  position: relative;
+  display: flex;
+  justify-content: center;
+}
+
+.timeline-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background-color: #2196F3;
+  z-index: 1;
+  margin-top: 4px;
+  border: 2px solid white;
+}
+
+.timeline-line {
+  width: 2px;
+  height: 100%;
+  background-color: #e0e0e0;
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 0;
+}
+
+.timeline-item:first-child .timeline-line {
+  top: 16px;
+}
+.timeline-item:last-child .timeline-line {
+  bottom: calc(100% - 16px);
+}
+
+.timeline-content {
+  flex: 1;
+  background-color: #f7faff;
+  border-radius: 8px;
+  padding: 12px;
+  border: 1px solid #e0e0e0;
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.timeline-content:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.timeline-content.active {
+  border-left: 3px solid #2196F3;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.timeline-title {
+  font-weight: 600;
+  font-size: 14px;
+  margin-bottom: 4px;
+  color: #333;
+}
+
+.timeline-description {
+  font-size: 12px;
+  color: #666;
+  line-height: 1.4;
+}
+
+.timeline-duration {
+  display: inline-block;
+  font-size: 11px;
+  color: #2196F3;
+  background-color: #e3f2fd;
+  padding: 2px 6px;
+  border-radius: 4px;
+  margin-top: 8px;
+  font-weight: 500;
+}
+
+/* Mobile-only button to re-open the timeline */
+.timeline-toggle {
+  position: fixed;
+  bottom: 90px; /* Position above card carousel */
+  right: 20px;
+  width: 50px;
+  height: 50px;
+  background-color: #2196F3;
+  color: white;
+  border: none;
+  border-radius: 50%;
+  font-size: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+  cursor: pointer;
+  z-index: 990; /* Below timeline overlay but above map items */
+  transition: transform 0.3s ease, opacity 0.3s ease;
+  transform: scale(1);
+}
+
+/* Global Spinner */
+#spinner {
+  position: fixed;
+  z-index: 1001;
+  height: 2.5em;
+  width: 2.5em;
+  overflow: visible;
+  margin: auto;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  right: 0;
+  border: 4px solid rgba(0, 0, 0, 0.1);
+  border-top: 4px solid #2196F3;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Media Queries for tablet portrait and mobile */
+@media (max-width: 1024px) {
+  /* On smaller screens, timeline becomes a fixed overlay */
+  .timeline-container {
+    position: fixed;
+    top: 0;
+    right: 0;
+    width: 90%;
+    max-width: 340px;
+    height: 100%; /* Be explicit for fixed positioning */
+    transform: translateX(100%);
+    transition: transform 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    padding-top: 1.5rem; /* Add space at the top for status bars/notches */
+  }
+
+  body.timeline-visible .timeline-container {
+    transform: translateX(0);
+  }
+
+  /* Enable the overlay on mobile */
+  .map-overlay {
+    display: block;
+  }
+}
+
+/* Hide the toggle button when the timeline is visible on mobile */
+body.timeline-visible .timeline-toggle {
+  transform: scale(0);
+  pointer-events: none;
+}
+
+@media (min-width: 1025px) {
+  /* Hide the toggle button on desktop, as it's not needed */
+  .timeline-toggle {
+    display: none !important;
+  }
+}
+
+@media (max-width: 768px) {
+  .app-header {
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    padding: 12px;
+  }
+  
+  .search-container {
+    flex-direction: column;
+    width: 100%;
+    gap: 12px;
+    align-items: stretch;
+  }
+  
+  .search-bar {
+    width: 100%;
+    order: 2; /* Search bar at the bottom of the group */
+  }
+
+  .timeline-container {
+    max-width: 320px; /* Adjust for phone sizes */
+  }
+
+  .card-carousel {
+    bottom: 10px;
+  }
+  
+  .card-container {
+    padding: 10px 15px;
+    scroll-padding: 0 5%;
+  }
+
+  .location-card {
+    flex: 0 0 90%;
+  }
+
+  .timeline-header .close-button .btn-text {
+    display: none;
+  }
+  .timeline-header .close-button i {
+    margin-right: 0;
+  }
+}
+
+.version-marker {
+  position: fixed;
+  bottom: 5px;
+  right: 5px;
+  font-size: 10px;
+  color: #aaa;
+  z-index: 2000;
+  background-color: rgba(255, 255, 255, 0.8);
+  padding: 2px 4px;
+  border-radius: 3px;
+}
+

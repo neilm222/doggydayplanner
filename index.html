@@ -1,0 +1,117 @@
+<!doctype html>
+<html>
+  <head>
+    <title>Dog-Friendly Map Explorer</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="stylesheet" href="index.css">
+    <!-- Leaflet.js CSS for map rendering -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+    <script type="importmap">
+{
+  "imports": {
+    "@google/genai": "https://esm.sh/@google/genai@^0.14.0",
+    "jspdf": "https://esm.sh/jspdf@^3.0.1",
+    "html2canvas": "https://esm.sh/html2canvas@^1.4.1"
+  }
+}
+</script>
+    <!-- Leaflet.js JavaScript library -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  </head>
+  <body>
+    <header class="app-header">
+       <!-- App logo icon -->
+      <div class="app-logo">
+        <i class="fas fa-paw"></i>
+      </div>
+      <!-- Container for search elements positioned at the top -->
+      <div class="search-container">
+        <div class="search-bar">
+          <i class="fas fa-search search-icon"></i>
+          <textarea
+            id="prompt-input"
+            placeholder="Plan a dog-friendly day in... (e.g. 'Austin, TX')"
+          ></textarea>
+          <button id="generate" class="search-button">
+            <i class="fas fa-arrow-right"></i>
+            <div class="spinner"></div>
+          </button>
+        </div>
+
+        <div class="error" id="error-message"></div>
+      </div>
+    </header>
+
+    <main class="main-content">
+      <!-- Main container for the map and related UI elements -->
+      <div id="map-container" class="map-container">
+        <!-- Error message overlay for when the map fails to load -->
+        <div id="map-error" class="map-error-overlay util-hidden">
+          <div class="map-error-content">
+              <i class="fas fa-map-marked-alt"></i>
+              <h3>Map Unavailable</h3>
+              <p>The interactive map could not be loaded. This may be due to the API key settings in this environment.</p>
+              <p>You can still generate dog-friendly suggestions, which will appear below.</p>
+          </div>
+        </div>
+
+        <div id="map"></div>
+
+        <!-- Carousel for displaying location cards at the bottom -->
+        <div class="card-carousel">
+          <div class="card-container" id="card-container">
+            <!-- Location cards will be dynamically inserted here by the script -->
+          </div>
+          <div class="carousel-controls">
+            <button class="carousel-arrow prev" id="prev-card">
+              <i class="fas fa-chevron-left"></i>
+            </button>
+            <div class="carousel-indicators" id="carousel-indicators">
+              <!-- Indicator dots will be added dynamically -->
+            </div>
+            <button class="carousel-arrow next" id="next-card">
+              <i class="fas fa-chevron-right"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Semi-transparent overlay displayed when timeline is open on mobile -->
+      <div class="map-overlay" id="map-overlay"></div>
+
+      <!-- Sliding panel for displaying the day plan timeline -->
+      <div class="timeline-container" id="timeline-container">
+        <div class="timeline-header">
+          <h3>Your Doggy Day Plan</h3>
+          <div class="timeline-actions" id="timeline-actions">
+            <button id="close-timeline" class="close-button" aria-label="Close Timeline">
+              <i class="fas fa-times"></i><span class="btn-text">Close</span>
+            </button>
+          </div>
+        </div>
+        <div class="timeline" id="timeline">
+          <!-- Timeline items representing the day plan will be inserted here -->
+        </div>
+        <div class="timeline-footer util-hidden" id="timeline-footer">
+            <button id="export-button" class="export-button">
+              <i class="fas fa-file-pdf"></i>
+              Export Plan to PDF
+            </button>
+        </div>
+      </div>
+    </main>
+    
+    <!-- Button to toggle timeline visibility on mobile -->
+    <button id="timeline-toggle" class="timeline-toggle util-hidden">
+      <i class="fas fa-calendar-alt"></i>
+    </button>
+    
+    <div id="spinner" class="util-hidden spinner"></div>
+    
+    <!-- Version marker for debugging deployment issues -->
+    <div class="version-marker">v15.0</div>
+
+    <script type="module" src="index.js"></script>
+  </body>
+</html>

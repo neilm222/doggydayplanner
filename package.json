@@ -1,0 +1,17 @@
+{
+  "name": "doggy-day-planner",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build": "esbuild index.tsx --bundle --outfile=index.js"
+  },
+  "dependencies": {
+    "@google/genai": "^0.14.0",
+    "@types/node": "^20.0.0",
+    "esbuild": "^0.20.2",
+    "html2canvas": "^1.4.1",
+    "jspdf": "^2.5.1",
+    "typescript": "^5.0.0"
+  },
+  "devDependencies": {}
+}
