@@ -122,7 +122,9 @@ async function sendText(prompt: string) {
 
     if (!response.ok) {
       const errorData = await response.json();
-      throw new Error(errorData.error || 'The server returned an error.');
+      // Prioritize the detailed message from the server if it exists.
+      const message = errorData.details || errorData.error || 'The server returned an error.';
+      throw new Error(message);
     }
     
     const data = await response.json();
@@ -164,7 +166,7 @@ async function sendText(prompt: string) {
     }
 
   } catch (e) {
-    if (errorMessage) errorMessage.innerHTML = "Failed to connect to the planning service. Ensure the Netlify URL is correct in the code. " + e.message;
+    if (errorMessage) errorMessage.innerHTML = "Failed to connect to the planning service: " + e.message;
     console.error('Error sending prompt:', e);
   } finally {
     if (buttonEl) buttonEl.classList.remove('loading');
