@@ -157,10 +157,10 @@ export default async (req: Request) => {
     
     const response = await ai.models.generateContent({
       model: 'gemini-2.5-flash',
-      contents: { parts: [{ text: prompt }] },
+      contents: prompt,
       config: {
         systemInstruction: systemInstructions,
-        temperature: 1,
+        temperature: 0.5,
         // Disable thinking to speed up the response and avoid serverless timeouts.
         thinkingConfig: { thinkingBudget: 0 },
         tools: [
