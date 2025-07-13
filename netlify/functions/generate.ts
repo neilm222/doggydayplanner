@@ -156,6 +156,8 @@ export default async (req: Request) => {
       config: {
         systemInstruction: systemInstructions,
         temperature: 1,
+        // Disable thinking to speed up the response and avoid serverless timeouts.
+        thinkingConfig: { thinkingBudget: 0 },
         tools: [
           {
             functionDeclarations: [
