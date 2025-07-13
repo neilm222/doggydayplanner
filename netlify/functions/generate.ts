@@ -157,7 +157,10 @@ export default async (req: Request) => {
     
     const response = await ai.models.generateContent({
       model: 'gemini-2.5-flash',
-      contents: prompt,
+      contents: {
+        role: 'user',
+        parts: [{ text: prompt }],
+      },
       config: {
         systemInstruction: systemInstructions,
         temperature: 0.5,
