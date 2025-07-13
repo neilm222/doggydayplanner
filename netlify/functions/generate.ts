@@ -173,8 +173,16 @@ export default async (req: Request) => {
         ],
       },
     });
-
-    const functionCalls = response.functionCalls ?? [];
+    
+    // The Gemini API returns function calls within the 'parts' of the first candidate's content.
+    // This is the robust way to extract them.
+    const functionCalls = response.candidates?.[0]?.content?.parts
+      // Filter out any parts that are not function calls.
+      .filter(part => !!part.functionCall)
+      // Map the array to contain just the functionCall object.
+      .map(part => part.functionCall) 
+      // If there are no function calls, default to an empty array.
+      ?? [];
     
     // Send the function calls back to the client
     return new Response(JSON.stringify({ functionCalls }), {
