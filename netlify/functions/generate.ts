@@ -136,6 +136,12 @@ export default async (req: Request) => {
   }
 
   try {
+    // Add a check for the API key at the beginning. This provides a clear
+    // error message if the environment variable is not set.
+    if (!process.env.API_KEY) {
+      throw new Error('The API_KEY environment variable is not set in the Netlify configuration.');
+    }
+    
     const { prompt } = await req.json();
     if (!prompt) {
       return new Response(JSON.stringify({ error: 'Prompt is required' }), {
@@ -145,7 +151,6 @@ export default async (req: Request) => {
     }
     
     // Initialize the Google AI client with the API key from environment variables
-    // This is the secure way to handle API keys on the server.
     const ai = new GoogleGenAI({
       apiKey: process.env.API_KEY,
     });
